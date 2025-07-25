@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plaid Link Demo</title>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background-color: #f0f0f0;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>Plaid Link Demo</h1>
+    <p>This demo shows how to use Plaid Link to get a public token that you can exchange for an access token.</p>
+    
+    <div>
+        <label for="linkToken">Link Token:</label><br>
+        <input type="text" id="linkToken" style="width: 100%; padding: 10px; margin: 10px 0;" 
+               placeholder="Paste the link token from link_token_create.py here">
+        <br>
+        <button id="linkButton" onclick="startPlaidLink()" disabled>Connect Bank Account</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <h2>Mortgage Document Analysis</h2>
+    <div style="border: 2px dashed #ccc; padding: 20px; margin: 20px 0; border-radius: 8px;">
+        <h3>📄 Upload Your Mortgage Agreement</h3>
+        <p>Upload your mortgage documents (PDF, PNG, JPG) and get an AI-powered analysis of your terms, rates, and conditions.</p>
+        
+        <input type="file" id="mortgageFile" accept=".pdf,.png,.jpg,.jpeg" style="margin: 10px 0;">
+        <br>
+        <button id="analyzeButton" onclick="analyzeMortgage()" disabled>🔍 Analyze Mortgage Document</button>
+        
+        <div id="analysisResult" style="display: none;"></div>
+        <div id="analysisLoading" style="display: none;">
+            <p>🤖 AI is analyzing your mortgage document... This may take a moment.</p>
+        </div>
+    </div>
+    
+    <h2>Instructions:</h2>
+    <ol>
+        <li>Run <code>python link_token_create.py</code> to get a link token</li>
+        <li>Paste the link token in the input field above</li>
+        <li>Click "Connect Bank Account" to start Plaid Link</li>
+        <li>Follow the prompts to connect a bank account (use Sandbox credentials in development)</li>
+        <li>Copy the public token that appears below</li>
+        <li>Run <code>python exchange_token.py</code> and paste the public token to get your access token</li>
+    </ol>
+    
+    <h3>Sandbox Test Credentials:</h3>
+    <p>For testing in Sandbox mode, you can use these credentials:</p>
+    <ul>
+        <li><strong>Username:</strong> user_good</li>
+        <li><strong>Password:</strong> pass_good</li>
+        <li><strong>PIN:</strong> 1234 (if asked)</li>
+    </ul>
+
+    <script>
+        // Enable the button when a link token is entered
+        document.getElementById('linkToken').addEventListener('input', function() {
+            const linkToken = this.value.trim();
+            const button = document.getElementById('linkButton');
+            button.disabled = !linkToken;
+        });
+
+        // Enable analyze button when a file is selected
+        document.getElementById('mortgageFile').addEventListener('change', function() {
+            const file = this.files[0];
+            const button = document.getElementById('analyzeButton');
+            button.disabled = !file;
+        });
+
+        function startPlaidLink() {
+            const linkToken = document.getElementById('linkToken').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            if (!linkToken) {
+                showResult('Please enter a link token first.', 'error');
+                return;
+            }
+            
+            try {
+                const handler = Plaid.create({
+                    token: linkToken,
+                    onSuccess: (public_token, metadata) => {
+                        console.log('Success:', public_token, metadata);
+                        showResult(`Success! Public Token: ${public_token}\n\nNow run: python exchange_token.py\nAnd paste this public token when prompted.`, 'success');
+                    },
+                    onLoad: () => {
+                        console.log('Plaid Link loaded');
+                    },
+                    onExit: (err, metadata) => {
+                        console.log('Exit:', err, metadata);
+                        if (err) {
+                            showResult(`Link exited with error: ${err.error_message || err.error_code}`, 'error');
+                        } else {
+                            showResult('Link exited without completing.', 'error');
+                        }
+                    },
+                    onEvent: (eventName, metadata) => {
+                        console.log('Event:', eventName, metadata);
+                    }
+                });
+
+                handler.open();
+            } catch (error) {
+                console.error('Error creating Plaid handler:', error);
+                showResult(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.whiteSpace = 'pre-wrap';
+            resultDiv.textContent = message;
+        }
+
+        async function analyzeMortgage() {
+            const fileInput = document.getElementById('mortgageFile');
+            const file = fileInput.files[0];
+            const loadingDiv = document.getElementById('analysisLoading');
+            const resultDiv = document.getElementById('analysisResult');
+            
+            if (!file) {
+                showAnalysisResult('Please select a file first.', 'error');
+                return;
+            }
+            
+            // Show loading
+            loadingDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const formData = new FormData();
+                formData.append('mortgage_file', file);
+                
+                const response = await fetch('/api/analyze-mortgage', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to analyze document');
+                }
+                
+                showAnalysisResult(formatAnalysisResult(data), 'success');
+                
+            } catch (error) {
+                console.error('Error analyzing mortgage:', error);
+                showAnalysisResult(`Error: ${error.message}`, 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        function showAnalysisResult(message, type) {
+            const resultDiv = document.getElementById('analysisResult');
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.whiteSpace = 'pre-wrap';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = message;
+        }
+        
+        function formatAnalysisResult(data) {
+            return `
+<h3>📊 Comprehensive Mortgage Analysis Results</h3>
+<div style="text-align: left;">
+
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+    <p><strong>Analysis Method:</strong> ${data.analysis_method || 'Standard Analysis'}</p>
+</div>
+
+<div style="border-left: 4px solid #007bff; padding-left: 15px; margin-bottom: 20px;">
+    <h4>1. 📋 Executive Summary</h4>
+    <p style="line-height: 1.6;">${data.executive_summary || data.summary || 'No executive summary available'}</p>
+</div>
+
+<div style="border-left: 4px solid #28a745; padding-left: 15px; margin-bottom: 20px;">
+    <h4>2. 💰 Key Financial Terms</h4>
+    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+        ${data.key_financial_terms || data.loan_details || 'No financial terms extracted'}
+    </div>
+</div>
+
+<div style="border-left: 4px solid #ffc107; padding-left: 15px; margin-bottom: 20px;">
+    <h4>3. 💸 Fees & Penalties</h4>
+    <p style="line-height: 1.6;">${data.fees_penalties || 'No fees and penalties information found'}</p>
+</div>
+
+<div style="border-left: 4px solid #17a2b8; padding-left: 15px; margin-bottom: 20px;">
+    <h4>4. 📝 Borrower Obligations & Covenants</h4>
+    <p style="line-height: 1.6;">${data.borrower_obligations || data.key_terms || 'No borrower obligations identified'}</p>
+</div>
+
+<div style="border-left: 4px solid #6f42c1; padding-left: 15px; margin-bottom: 20px;">
+    <h4>5. ⚖️ Lender Rights & Remedies</h4>
+    <p style="line-height: 1.6;">${data.lender_rights || 'No lender rights information found'}</p>
+</div>
+
+<div style="border-left: 4px solid #dc3545; padding-left: 15px; margin-bottom: 20px;">
+    <h4>6. ⚠️ Risk / Red-Flag Checklist</h4>
+    <div style="background-color: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;">
+        ${data.risk_red_flags || 'No risk flags identified'}
+    </div>
+</div>
+
+${data.market_comparison && data.market_comparison !== 'No market comparison available' ? `
+<div style="border-left: 4px solid #fd7e14; padding-left: 15px; margin-bottom: 20px;">
+    <h4>7. 📈 Comparison to Market Norms</h4>
+    <p style="line-height: 1.6;">${data.market_comparison}</p>
+</div>
+` : ''}
+
+<div style="border-left: 4px solid #20c997; padding-left: 15px; margin-bottom: 20px;">
+    <h4>8. ❓ Questions for the Borrower to Ask</h4>
+    <div style="background-color: #e8f5e9; padding: 10px; border-radius: 4px;">
+        ${data.borrower_questions || data.recommendations || 'No specific questions generated'}
+    </div>
+</div>
+
+<div style="border-left: 4px solid #6c757d; padding-left: 15px; margin-bottom: 20px;">
+    <h4>9. 📚 References</h4>
+    <p style="line-height: 1.6; font-style: italic;">${data.references || 'Document references would be provided with full AI analysis.'}</p>
+</div>
+
+${data.full_analysis ? `
+<details style="margin-top: 20px;">
+    <summary style="cursor: pointer; font-weight: bold; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+        📄 View Full AI Analysis Report
+    </summary>
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 10px; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">
+        ${data.full_analysis}
+    </div>
+</details>
+` : ''}
+
+</div>
+            `.trim();
+        }
+    </script>
+</body>
+</html> 

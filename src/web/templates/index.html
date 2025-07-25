@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .rate-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .rate-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .rate-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .rate-card h3 {
+            color: #333;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .rate-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .rate-date {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .comparison {
+            background: #f1f3f4;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .difference {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .difference.positive {
+            color: #28a745;
+        }
+
+        .difference.negative {
+            color: #dc3545;
+        }
+
+        .recommendation {
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+        .recommendation.refinance {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .recommendation.no-refinance {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #666;
+            margin: 40px 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #f5c6cb;
+            margin: 20px 0;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .refresh-btn:hover {
+            background: #5a67d8;
+        }
+
+        .section-divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            margin: 50px 0;
+            border-radius: 2px;
+        }
+
+        .document-analysis {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 30px 0;
+            border: 2px dashed #dee2e6;
+            transition: border-color 0.3s ease;
+        }
+
+        .document-analysis:hover {
+            border-color: #667eea;
+        }
+
+        .upload-area {
+            padding: 30px;
+            border: 2px dashed #dee2e6;
+            border-radius: 15px;
+            background: white;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin: 10px;
+        }
+
+        .upload-btn:hover {
+            background: #218838;
+        }
+
+        .upload-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .analysis-results {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            text-align: left;
+            border: 1px solid #e9ecef;
+        }
+
+        .analysis-results h4 {
+            color: #333;
+            margin: 15px 0 10px 0;
+            font-size: 1.1rem;
+        }
+
+        .analysis-results p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .rate-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .container {
+                padding: 20px;
+                max-width: 95%;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .rate-value {
+                font-size: 2.5rem;
+            }
+            
+            .document-analysis {
+                padding: 20px;
+            }
+            
+            .upload-area {
+                padding: 20px;
+            }
+            
+            .upload-area h3 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Personal Finance Dashboard</h1>
+            <p>Track mortgage rates, analyze documents, and make informed financial decisions</p>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            Loading current mortgage rates...
+        </div>
+
+        <div id="content" style="display: none;">
+            <div class="rate-container">
+                <div class="rate-card">
+                    <h3>Current Market Rate</h3>
+                    <div class="rate-value" id="currentRate">-</div>
+                    <div class="rate-date" id="rateDate">Loading...</div>
+                </div>
+                <div class="rate-card">
+                    <h3>Your Mortgage Rate</h3>
+                    <div class="rate-value" id="yourRate">6.575%</div>
+                    <div class="rate-date">Your current rate</div>
+                </div>
+            </div>
+
+            <div class="comparison">
+                <h3>Rate Difference</h3>
+                <div class="difference" id="rateDifference">-</div>
+            </div>
+
+            <div class="recommendation" id="recommendation">
+                <!-- Recommendation will be populated by JavaScript -->
+            </div>
+
+            <button class="refresh-btn" onclick="loadMortgageData()">
+                🔄 Refresh Data
+            </button>
+        </div>
+
+        <!-- Section Divider -->
+        <div class="section-divider"></div>
+
+        <!-- Mortgage Document Analysis Section -->
+        <div class="document-analysis">
+            <h2>📄 Mortgage Document Analysis</h2>
+            <p>Upload your mortgage documents and get AI-powered analysis of your terms, rates, and conditions</p>
+            
+            <div class="upload-area" onclick="document.getElementById('mortgageFile').click()" id="uploadArea">
+                <div id="uploadContent">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📄</div>
+                    <h3>Click or drag your mortgage document here</h3>
+                    <p>Supports PDF, PNG, JPG files (max 16MB)</p>
+                    <input type="file" id="mortgageFile" class="file-input" accept=".pdf,.png,.jpg,.jpeg">
+                </div>
+                <div id="fileSelected" style="display: none;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">✅</div>
+                    <h3 id="fileName">File selected</h3>
+                    <p>Click "Analyze Document" to proceed</p>
+                </div>
+            </div>
+            
+            <button id="analyzeButton" class="upload-btn" onclick="analyzeMortgage()" disabled>
+                🔍 Analyze Document
+            </button>
+            
+            <div id="analysisLoading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                AI is analyzing your mortgage document... This may take a moment.
+            </div>
+            
+            <div id="analysisResult" style="display: none;"></div>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            <strong>Error:</strong> <span id="errorMessage"></span>
+            <button class="refresh-btn" onclick="loadMortgageData()">
+                Try Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        async function loadMortgageData() {
+            const loading = document.getElementById('loading');
+            const content = document.getElementById('content');
+            const error = document.getElementById('error');
+            
+            // Show loading, hide others
+            loading.style.display = 'flex';
+            content.style.display = 'none';
+            error.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/mortgage-data');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch data');
+                }
+                
+                // Update the UI with the data
+                document.getElementById('currentRate').textContent = `${data.current_rate.toFixed(3)}%`;
+                document.getElementById('rateDate').textContent = `As of ${data.date}`;
+                
+                const difference = data.rate_difference;
+                const diffElement = document.getElementById('rateDifference');
+                
+                if (difference > 0) {
+                    diffElement.textContent = `+${difference.toFixed(3)}%`;
+                    diffElement.className = 'difference positive';
+                } else {
+                    diffElement.textContent = `${difference.toFixed(3)}%`;
+                    diffElement.className = 'difference negative';
+                }
+                
+                // Update recommendation
+                const recommendationElement = document.getElementById('recommendation');
+                if (data.should_refinance) {
+                    recommendationElement.textContent = "💡 Consider refinancing";
+                    recommendationElement.className = 'recommendation refinance';
+                } else {
+                    recommendationElement.textContent = "✅ Current rate difference doesn't warrant refinancing";
+                    recommendationElement.className = 'recommendation no-refinance';
+                }
+                
+                // Show content, hide loading
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                
+            } catch (err) {
+                console.error('Error fetching mortgage data:', err);
+                document.getElementById('errorMessage').textContent = err.message;
+                loading.style.display = 'none';
+                error.style.display = 'block';
+            }
+        }
+        
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', loadMortgageData);
+
+        // Document Analysis Functions
+        document.getElementById('mortgageFile').addEventListener('change', function() {
+            const file = this.files[0];
+            const button = document.getElementById('analyzeButton');
+            const uploadContent = document.getElementById('uploadContent');
+            const fileSelected = document.getElementById('fileSelected');
+            const fileName = document.getElementById('fileName');
+            
+            if (file) {
+                uploadContent.style.display = 'none';
+                fileSelected.style.display = 'block';
+                fileName.textContent = file.name;
+                button.disabled = false;
+            } else {
+                uploadContent.style.display = 'block';
+                fileSelected.style.display = 'none';
+                button.disabled = true;
+            }
+        });
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('mortgageFile').files = files;
+                document.getElementById('mortgageFile').dispatchEvent(new Event('change'));
+            }
+        });
+
+        async function analyzeMortgage() {
+            const fileInput = document.getElementById('mortgageFile');
+            const file = fileInput.files[0];
+            const loadingDiv = document.getElementById('analysisLoading');
+            const resultDiv = document.getElementById('analysisResult');
+            
+            if (!file) {
+                showAnalysisResult('Please select a file first.', 'error');
+                return;
+            }
+            
+            // Show loading
+            loadingDiv.style.display = 'flex';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const formData = new FormData();
+                formData.append('mortgage_file', file);
+                
+                const response = await fetch('/api/analyze-mortgage', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to analyze document');
+                }
+                
+                showAnalysisResult(formatAnalysisResult(data), 'success');
+                
+            } catch (error) {
+                console.error('Error analyzing mortgage:', error);
+                showAnalysisResult(`Error: ${error.message}`, 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        function showAnalysisResult(message, type) {
+            const resultDiv = document.getElementById('analysisResult');
+            resultDiv.className = type === 'error' ? 'error' : 'analysis-results';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = message;
+        }
+        
+        function formatAnalysisResult(data) {
+            return `
+<h3>📊 Comprehensive Mortgage Analysis Results</h3>
+<div class="analysis-results">
+
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+    <p><strong>Analysis Method:</strong> ${data.analysis_method || 'Standard Analysis'}</p>
+</div>
+
+<div style="border-left: 4px solid #007bff; padding-left: 15px; margin-bottom: 20px;">
+    <h4>1. 📋 Executive Summary</h4>
+    <p style="line-height: 1.6;">${data.executive_summary || data.summary || 'No executive summary available'}</p>
+</div>
+
+<div style="border-left: 4px solid #28a745; padding-left: 15px; margin-bottom: 20px;">
+    <h4>2. 💰 Key Financial Terms</h4>
+    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+        ${data.key_financial_terms || data.loan_details || 'No financial terms extracted'}
+    </div>
+</div>
+
+<div style="border-left: 4px solid #ffc107; padding-left: 15px; margin-bottom: 20px;">
+    <h4>3. 💸 Fees & Penalties</h4>
+    <p style="line-height: 1.6;">${data.fees_penalties || 'No fees and penalties information found'}</p>
+</div>
+
+<div style="border-left: 4px solid #17a2b8; padding-left: 15px; margin-bottom: 20px;">
+    <h4>4. 📝 Borrower Obligations & Covenants</h4>
+    <p style="line-height: 1.6;">${data.borrower_obligations || data.key_terms || 'No borrower obligations identified'}</p>
+</div>
+
+<div style="border-left: 4px solid #6f42c1; padding-left: 15px; margin-bottom: 20px;">
+    <h4>5. ⚖️ Lender Rights & Remedies</h4>
+    <p style="line-height: 1.6;">${data.lender_rights || 'No lender rights information found'}</p>
+</div>
+
+<div style="border-left: 4px solid #dc3545; padding-left: 15px; margin-bottom: 20px;">
+    <h4>6. ⚠️ Risk / Red-Flag Checklist</h4>
+    <div style="background-color: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;">
+        ${data.risk_red_flags || 'No risk flags identified'}
+    </div>
+</div>
+
+${data.market_comparison && data.market_comparison !== 'No market comparison available' ? `
+<div style="border-left: 4px solid #fd7e14; padding-left: 15px; margin-bottom: 20px;">
+    <h4>7. 📈 Comparison to Market Norms</h4>
+    <p style="line-height: 1.6;">${data.market_comparison}</p>
+</div>
+` : ''}
+
+<div style="border-left: 4px solid #20c997; padding-left: 15px; margin-bottom: 20px;">
+    <h4>8. ❓ Questions for the Borrower to Ask</h4>
+    <div style="background-color: #e8f5e9; padding: 10px; border-radius: 4px;">
+        ${data.borrower_questions || data.recommendations || 'No specific questions generated'}
+    </div>
+</div>
+
+<div style="border-left: 4px solid #6c757d; padding-left: 15px; margin-bottom: 20px;">
+    <h4>9. 📚 References</h4>
+    <p style="line-height: 1.6; font-style: italic;">${data.references || 'Document references would be provided with full AI analysis.'}</p>
+</div>
+
+${data.full_analysis ? `
+<details style="margin-top: 20px;">
+    <summary style="cursor: pointer; font-weight: bold; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+        📄 View Full AI Analysis Report
+    </summary>
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 10px; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">
+        ${data.full_analysis}
+    </div>
+</details>
+` : ''}
+
+</div>
+            `;
+        }
+    </script>
+</body>
+</html> 
