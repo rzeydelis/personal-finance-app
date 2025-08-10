@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, Any
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -1206,6 +1207,166 @@ def update_safe_merchants():
     
     except Exception as e:
         return jsonify({'error': f'Failed to update safe merchants: {str(e)}'}), 500
+
+def _round_to_nearest(value: float, step: int) -> int:
+    try:
+        return int(round(value / step) * step)
+    except Exception:
+        return int(value)
+
+def calculate_condo_insurance_recommendations(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Rule-based HO-6 (condo) insurance needs calculator.
+
+    Inputs expected (all optional, with sensible defaults):
+      - square_feet: int/float
+      - finish_level: 'basic'|'standard'|'premium'
+      - hoa_policy_type: 'all-in'|'single-entity'|'bare-walls'
+      - hoa_deductible: number
+      - personal_property_estimate: number or None
+      - risk_factors: { hurricane, wildfire, earthquake, water_backup_risk, short_term_rental, floor_level }
+      - liability_preference: 'low'|'standard'|'high'
+      - deductible_preference: 'low'|'standard'|'high'
+      - high_value_items_total: number
+      - max_single_item_value: number
+    """
+    # Defaults and maps
+    finish = (payload.get('finish_level') or 'standard').lower()
+    finish_to_improvement_cost = {
+        'basic': 60,
+        'standard': 90,
+        'premium': 130,
+    }
+    finish_to_property_cost = {
+        'basic': 30,
+        'standard': 60,
+        'premium': 90,
+    }
+    square_feet = float(payload.get('square_feet') or 800)
+    hoa_type = (payload.get('hoa_policy_type') or 'single-entity').lower()
+    hoa_deductible = float(payload.get('hoa_deductible') or 25000)
+    personal_property_estimate = payload.get('personal_property_estimate')
+    risk = payload.get('risk_factors') or {}
+    liability_pref = (payload.get('liability_preference') or 'standard').lower()
+    deductible_pref = (payload.get('deductible_preference') or 'standard').lower()
+    high_value_total = float(payload.get('high_value_items_total') or 0)
+    max_single_item = float(payload.get('max_single_item_value') or 0)
+
+    # Compute Coverage A (Dwelling/Improvements) based on HOA policy type
+    per_sf_improve = float(finish_to_improvement_cost.get(finish, 90))
+    dwelling = 0.0
+    notes = []
+
+    if hoa_type in ['bare-walls', 'barewalls', 'bare_walls']:
+        dwelling = square_feet * per_sf_improve
+        notes.append('Bare-walls master policy: your HO-6 should insure interior structure to studs.')
+    elif hoa_type in ['single-entity', 'single_entity', 'singleentity']:
+        dwelling = max(25000, square_feet * per_sf_improve * 0.25)
+        notes.append('Single-entity master policy: base finishes covered; insure owner upgrades/betterments.')
+    else:  # all-in
+        dwelling = max(15000, square_feet * per_sf_improve * 0.10)
+        notes.append('All-in master policy: consider coverage for upgrades beyond original spec.')
+
+    # Coverage C (Personal Property)
+    per_sf_property = float(finish_to_property_cost.get(finish, 60))
+    if personal_property_estimate is None or float(personal_property_estimate) <= 0:
+        personal_property = square_feet * per_sf_property
+        notes.append('Personal property estimated from square footage and finish level — adjust if you have a detailed inventory.')
+    else:
+        personal_property = float(personal_property_estimate)
+
+    # Coverage D (Loss of Use) ~20% of Coverage C, with a sensible floor
+    loss_of_use = max(personal_property * 0.20, 30000)
+
+    # Coverage E (Personal Liability)
+    if liability_pref == 'low':
+        liability = 300_000
+    elif liability_pref == 'high':
+        liability = 1_000_000
+    else:
+        liability = 500_000
+    if risk.get('short_term_rental'):
+        liability = max(liability, 1_000_000)
+        notes.append('Short-term rental exposure detected — higher liability recommended and consider a personal umbrella policy.')
+
+    # Medical Payments to Others
+    medical_payments = 10_000 if liability_pref == 'high' else 5_000
+
+    # Loss Assessment — aim to at least match HOA deductible; many carriers cap at $50k–$100k
+    loss_assessment_target = max(hoa_deductible, 50_000)
+    if risk.get('hurricane') or risk.get('wildfire'):
+        loss_assessment_target = max(loss_assessment_target, 100_000)
+    loss_assessment = loss_assessment_target
+    notes.append('Loss assessment should at least match your HOA master deductible; many policies cap at $50k–$100k.')
+
+    # Water backup — higher if basement/ground or explicit risk
+    floor_level = (risk.get('floor_level') or '').lower()
+    water_backup = 5_000
+    if risk.get('water_backup_risk') or floor_level in ['basement', 'ground']:
+        water_backup = 10_000
+
+    # Deductible recommendation
+    if deductible_pref == 'low':
+        deductible = 500 if hoa_deductible <= 10_000 else 1_000
+    elif deductible_pref == 'high':
+        deductible = 2_500
+    else:
+        deductible = 1_000
+
+    # Ordinance or Law — % of Coverage A
+    ordinance_or_law = max(dwelling * 0.10, 10_000)
+
+    # Scheduled property guidance
+    should_schedule = max_single_item >= 1500 or high_value_total >= 5_000
+    sched_limit = max_single_item if should_schedule else 0
+    sched_notes = 'Schedule jewelry/collectibles individually to avoid sublimits.' if should_schedule else 'No scheduling needed based on provided values.'
+
+    # Hazard disclaimers
+    if risk.get('earthquake'):
+        notes.append('Earthquake is not covered by standard HO-6; consider separate EQ policy or endorsement if available.')
+    if risk.get('hurricane'):
+        notes.append('Wind/hail and hurricane deductibles may apply under the master policy and your HO-6; verify percentages and triggers.')
+    if risk.get('wildfire'):
+        notes.append('Wildfire risk may impact availability and pricing; keep inventories and defensible-space practices.')
+    notes.append('Flood (rising water) is excluded — consider an NFIP or private flood policy if in a flood-risk area.')
+
+    # Rounding for quoting clarity
+    dwelling = _round_to_nearest(dwelling, 1000)
+    personal_property = _round_to_nearest(personal_property, 1000)
+    loss_of_use = _round_to_nearest(loss_of_use, 1000)
+    ordinance_or_law = _round_to_nearest(ordinance_or_law, 1000)
+    loss_assessment = _round_to_nearest(loss_assessment, 5000)
+    water_backup = _round_to_nearest(water_backup, 1000)
+
+    return {
+        'inputs_echo': payload,
+        'recommended_coverages': {
+            'dwelling_improvements': dwelling,
+            'personal_property': personal_property,
+            'loss_of_use': loss_of_use,
+            'personal_liability': liability,
+            'medical_payments': medical_payments,
+            'loss_assessment': loss_assessment,
+            'water_backup': water_backup,
+            'deductible': deductible,
+            'ordinance_or_law': ordinance_or_law,
+        },
+        'scheduled_property_recommendation': {
+            'should_schedule': should_schedule,
+            'suggested_schedule_limit': _round_to_nearest(sched_limit, 100),
+            'notes': sched_notes,
+        },
+        'notes': notes,
+        'disclaimer': 'This is an educational estimate. Final eligibility, limits, and premium depend on insurer underwriting and policy forms.'
+    }
+
+@app.route('/api/condo-insurance-recommendations', methods=['POST'])
+def condo_insurance_recommendations():
+    try:
+        data = request.get_json() or {}
+        result = calculate_condo_insurance_recommendations(data)
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Failed to calculate recommendations: {str(e)}'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
