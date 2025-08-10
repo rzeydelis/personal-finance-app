@@ -3,8 +3,9 @@ import plaid
 from plaid.model.transactions_get_request import TransactionsGetRequest
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 from plaid.api import plaid_api
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv, find_dotenv
+import sys
 
 # Load environment variables from .env file (robust to cwd changes)
 load_dotenv(find_dotenv(), override=True)
@@ -18,7 +19,7 @@ ACCESS_TOKEN = os.getenv('PLAID_ACCESS_TOKEN')
 # Map environment name to Plaid environment
 env_mapping = {
     'sandbox': plaid.Environment.Sandbox,
-    # Map development to Sandbox if SDK lacks Development
+    # Map development to Sandbox if the SDK lacks a Development env
     'development': plaid.Environment.Sandbox,
     'production': plaid.Environment.Production
 }
@@ -44,10 +45,26 @@ configuration = plaid.Configuration(
 api_client = plaid.ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
 
-# 3. Define the date range for transactions
-today = datetime.today()
-start_date = (today - timedelta(days=360)).date() # Fetch transactions from the last 30 days
-end_date = today.date()
+# 3. Parse command line arguments for date range
+if len(sys.argv) != 3:
+    print("Usage: python get_bank_trx_custom.py <start_date> <end_date>")
+    print("Date format: YYYY-MM-DD")
+    sys.exit(1)
+
+try:
+    start_date_str = sys.argv[1]
+    end_date_str = sys.argv[2]
+    
+    # Parse dates
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    
+    print(f"Fetching transactions from {start_date} to {end_date}")
+    
+except ValueError as e:
+    print(f"Error parsing dates: {e}")
+    print("Please use format: YYYY-MM-DD")
+    sys.exit(1)
 
 # 4. Construct the request to retrieve transactions
 request = TransactionsGetRequest(
@@ -60,13 +77,14 @@ request = TransactionsGetRequest(
 # 5. Make the API call and handle pagination
 try:
     response = client.transactions_get(request)
-    transactions = response.get('transactions', [])
+    # Use attribute access per Plaid SDK models
+    transactions = list(response.transactions)
 
     # Plaid returns paginated results, so loop to retrieve all transactions if needed
-    while len(transactions) < response['total_transactions']:
+    while len(transactions) < response.total_transactions:
         request.options.offset = len(transactions) # Update offset for the next page
         response = client.transactions_get(request)
-        transactions.extend(response.get('transactions', []))
+        transactions.extend(response.transactions)
 
     # 6. Process the retrieved transactions and save to file
     output_filename = f"transactions_{start_date}_to_{end_date}.txt"
@@ -93,5 +111,7 @@ try:
 
 except plaid.ApiException as e:
     print(f"Plaid API Error: {e}")
+    sys.exit(1)
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
+    sys.exit(1) 
