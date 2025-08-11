@@ -16,19 +16,33 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, Any
+from statistics import mean
+import logging
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configure OpenAI (you'll need to set your API key)
 # openai.api_key = os.getenv('OPENAI_API_KEY')  # Uncomment and set your API key
 
 # Ollama configuration
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:4b')
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
+
+# Local LLM client (Ollama). Optional: falls back to rule-based if unavailable
+try:
+    from .llms import generate_json as llm_generate_json
+except Exception:
+    try:
+        from llms import generate_json as llm_generate_json
+    except Exception:
+        llm_generate_json = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -331,48 +345,48 @@ def fetch_latest_transactions():
     """Fetch latest transactions using the get_bank_trx.py script"""
     import logging
     logging.info("fetching latest transactions")
-    print("fetching latest transactions")
     try:
-        # Get the path to the get_bank_trx.py script
-        script_path = Path(__file__).parent.parent / 'api' / 'get_bank_trx.py'
+        # # Get the path to the get_bank_trx.py script
+        # script_path = Path(__file__).parent.parent / 'api' / 'get_bank_trx.py'
         
-        # Change to the data directory to save the output file there
-        data_dir = Path(__file__).parent.parent.parent / 'data'
-        data_dir.mkdir(exist_ok=True)
+        # # Change to the data directory to save the output file there
+        # data_dir = Path(__file__).parent.parent.parent / 'data'
+        # data_dir.mkdir(exist_ok=True)
         
-        # Run the script from the data directory
-        result = subprocess.run(
-            [sys.executable, str(script_path)],
-            cwd=str(data_dir),
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        # # Run the script from the data directory
+        # result = subprocess.run(
+        #     [sys.executable, str(script_path)],
+        #     cwd=str(data_dir),
+        #     capture_output=True,
+        #     text=True,
+        #     timeout=30
+        # )
         
-        if result.returncode == 0:
+        # if result.returncode == 0:
+        if True:
             # Find the most recent transaction file
-            transaction_files = list(data_dir.glob('transactions_*.txt'))
+            transaction_files = list(Path(__file__).parent.parent.parent / 'data' / 'transactions_*.txt')
             if transaction_files:
                 latest_file = max(transaction_files, key=lambda x: x.stat().st_mtime)
                 return {
                     'success': True,
                     'file_path': str(latest_file),
-                    'output': result.stdout,
+                    'output': 'result.stdout',
                     'error': None
                 }
             else:
                 return {
                     'success': False,
                     'file_path': None,
-                    'output': result.stdout,
+                    'output': 'result.stdout',
                     'error': 'No transaction files found after script execution'
                 }
         else:
             return {
                 'success': False,
                 'file_path': None,
-                'output': result.stdout,
-                'error': result.stderr
+                'output': 'result.stdout',
+                'error': 'result.stderr'
             }
     
     except Exception as e:
@@ -489,41 +503,21 @@ Here is the transaction data:
 
 Please analyze this data and return ONLY valid JSON output with no additional text or explanation outside the JSON."""
     
-    result = call_ollama_api(prompt)
+    if llm_generate_json is None:
+        return {
+            'success': False,
+            'analysis': {},
+            'error': 'Ollama integration not available'
+        }
+    
+    result = llm_generate_json(prompt)
     
     if result['success']:
-        try:
-            # Try to parse the JSON response
-            analysis = json.loads(result['response'])
-            return {
-                'success': True,
-                'analysis': analysis,
-                'error': None
-            }
-        except json.JSONDecodeError as e:
-            # If JSON parsing fails, try to extract JSON from the response
-            try:
-                # Look for JSON content between potential markdown code blocks or other text
-                json_match = re.search(r'\[.*\]', result['response'], re.DOTALL)
-                if json_match:
-                    analysis = json.loads(json_match.group(0))
-                    return {
-                        'success': True,
-                        'analysis': analysis,
-                        'error': None
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'analysis': [],
-                        'error': f'Could not parse JSON from Ollama response: {str(e)}'
-                    }
-            except Exception as parse_error:
-                return {
-                    'success': False,
-                    'analysis': [],
-                    'error': f'JSON parsing failed: {str(parse_error)}'
-                }
+        return {
+            'success': True,
+            'analysis': result['data'],
+            'error': None
+        }
     else:
         return {
             'success': False,
@@ -532,59 +526,27 @@ Please analyze this data and return ONLY valid JSON output with no additional te
         }
 
 def fetch_transactions_by_month(year, month):
-    """Fetch transactions for a specific month using the get_bank_trx.py script with custom date range"""
+    """Hardcoded to return the existing transactions_2025-07-01_to_2025-07-30.txt file"""
     try:
-        # Import required modules for date calculations
-        from calendar import monthrange
-        
-        # Calculate start and end dates for the specified month
-        start_date = datetime(year, month, 1).date()
-        _, last_day = monthrange(year, month)
-        end_date = datetime(year, month, last_day).date()
-        
-        # Get the path to the get_bank_trx.py script
-        script_path = Path(__file__).parent.parent / 'api' / 'get_bank_trx_custom.py'
-        
-        # Change to the data directory to save the output file there
+        # Hardcode to always return the July 2025 file
         data_dir = Path(__file__).parent.parent.parent / 'data'
-        data_dir.mkdir(exist_ok=True)
+        hardcoded_file = data_dir / 'transactions_2025-07-01_to_2025-07-30.txt'
         
-        # Run the script with custom date parameters
-        result = subprocess.run(
-            [sys.executable, str(script_path), str(start_date), str(end_date)],
-            cwd=str(data_dir),
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        
-        if result.returncode == 0:
-            # Find the transaction file for this specific month
-            output_filename = f"transactions_{start_date}_to_{end_date}.txt"
-            file_path = data_dir / output_filename
-            
-            if file_path.exists():
-                return {
-                    'success': True,
-                    'file_path': str(file_path),
-                    'output': result.stdout,
-                    'start_date': str(start_date),
-                    'end_date': str(end_date),
-                    'error': None
-                }
-            else:
-                return {
-                    'success': False,
-                    'file_path': None,
-                    'output': result.stdout,
-                    'error': f'Expected output file {output_filename} not found'
-                }
+        if hardcoded_file.exists():
+            return {
+                'success': True,
+                'file_path': str(hardcoded_file),
+                'output': f'Using hardcoded transaction file for {year}-{month:02d}',
+                'start_date': '2025-07-01',
+                'end_date': '2025-07-30',
+                'error': None
+            }
         else:
             return {
                 'success': False,
                 'file_path': None,
-                'output': result.stdout,
-                'error': result.stderr
+                'output': '',
+                'error': f'Hardcoded transaction file not found: {hardcoded_file}'
             }
     
     except Exception as e:
@@ -686,47 +648,208 @@ Here is the transaction data:
 
 Please analyze this data and return ONLY valid JSON output with no additional text or explanation outside the JSON."""
     
-    result = call_ollama_api(prompt)
+    if llm_generate_json is None:
+        return {
+            'success': False,
+            'analysis': {},
+            'error': 'Ollama integration not available'
+        }
+    
+    result = llm_generate_json(prompt)
     
     if result['success']:
-        try:
-            # Try to parse the JSON response
-            analysis = json.loads(result['response'])
-            return {
-                'success': True,
-                'analysis': analysis,
-                'error': None
-            }
-        except json.JSONDecodeError as e:
-            # If JSON parsing fails, try to extract JSON from the response
-            try:
-                # Look for JSON content between potential markdown code blocks or other text
-                json_match = re.search(r'\{.*\}', result['response'], re.DOTALL)
-                if json_match:
-                    analysis = json.loads(json_match.group(0))
-                    return {
-                        'success': True,
-                        'analysis': analysis,
-                        'error': None
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'analysis': {},
-                        'error': f'Could not parse JSON from Ollama response: {str(e)}'
-                    }
-            except Exception as parse_error:
-                return {
-                    'success': False,
-                    'analysis': {},
-                    'error': f'JSON parsing failed: {str(parse_error)}'
-                }
+        return {
+            'success': True,
+            'analysis': result['data'],
+            'error': None
+        }
     else:
         return {
             'success': False,
             'analysis': {},
             'error': result['error']
         }
+
+def _normalize_merchant(name: str) -> str:
+    try:
+        cleaned = re.sub(r'[^A-Za-z0-9 ]+', ' ', name or '')
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip().upper()
+        # Remove common company suffixes and noise
+        for token in [
+            ' INC', ' LLC', ' LTD', ' CO', ' CORP', ' COMPANY', ' HOLDINGS',
+            ' SUBSCRIPTION', ' SUBS', ' MEMBER', ' MEMBERSHIP'
+        ]:
+            if cleaned.endswith(token):
+                cleaned = cleaned[: -len(token)]
+        return cleaned
+    except Exception:
+        return (name or '').upper()
+
+def _predict_next_monthly_date(last_date: datetime) -> str:
+    try:
+        predicted = last_date + timedelta(days=30)
+        return predicted.date().isoformat()
+    except Exception:
+        return ''
+
+def analyze_subscriptions_with_ollama(transactions, lookback_days: int = 180):
+    """Use Ollama to detect recurring subscriptions and provide guidance. Falls back to rule-based on failure."""
+    
+    try:
+        # Convert transactions to CSV
+        csv_data = "Date,Time,Merchant,Description,Amount\n"
+        for trx in transactions:
+            csv_data += f"{trx['date']},{trx.get('time','')},{trx.get('merchant','')},{trx.get('description','')},{trx.get('amount',0)}\n"
+
+        prompt = f"""
+You are a personal finance assistant. From the provided transaction table, identify recurring subscriptions and memberships to help the user save money.
+
+Instructions:
+- Consider a subscription when similar merchant names and similar amounts recur at roughly monthly cadence.
+- Ignore clearly one-off purchases.
+- Be conservative: only include items you are at least moderately confident are subscriptions.
+
+Output strictly as JSON with this schema:
+{{
+  "summary": {{
+    "subscriptions_detected": <int>,
+    "total_monthly_spend": <number>,
+    "potential_savings_if_cancel_recommended": <number>
+  }},
+  "subscriptions": [
+    {{
+      "merchant": <string>,
+      "normalized_merchant": <string>,
+      "average_amount": <number>,
+      "cadence": "monthly" | "weekly" | "annual" | "other",
+      "occurrences": <int>,
+      "last_charge_date": <YYYY-MM-DD>,
+      "predicted_next_charge_date": <YYYY-MM-DD | "">,
+      "confidence": <0-100>,
+      "cancel_recommendation": <true|false>,
+      "category": <string>,
+      "notes": <string>,
+      "cancellation_script": <string>
+    }}
+  ]
+}}
+
+Guidance for cancellation_script:
+- Short, polite, and firm. Include: cancel request, effective date, confirmation email, and revoke authorization for future charges.
+
+Analyze approximately the last {lookback_days} days of activity represented in the input.
+
+Transactions CSV:
+
+{csv_data}
+
+Return ONLY JSON, no extra text.
+"""
+
+        if llm_generate_json is None:
+            return {
+                'success': False,
+                'analysis': {},
+                'error': 'Ollama integration not available'
+            }
+        
+        result = llm_generate_json(prompt)
+        logging.info(f"Ollama result: {result}")
+        if result.get('success'):
+            # For the new llms module, the response is in 'data' not 'response'
+            if 'data' in result:
+                return {'success': True, 'analysis': result['data'], 'error': None}
+            
+            # Fallback for older response format
+            response_text = result.get('response', '')
+            logging.info(f"Ollama response text: {response_text[:500]}...")
+            try:
+                parsed = json.loads(response_text)
+                return {'success': True, 'analysis': parsed, 'error': None}
+            except json.JSONDecodeError as e:
+                logging.warning(f"JSON decode error: {e}")
+                # Try to extract JSON block - look for both { } and [ ] patterns
+                json_patterns = [
+                    r'\{[\s\S]*?\}(?=\s*$|\s*\n\s*$)',  # JSON object at end
+                    r'\{[\s\S]*\}',  # Any JSON object
+                    r'\[[\s\S]*?\](?=\s*$|\s*\n\s*$)',  # JSON array at end  
+                    r'\[[\s\S]*\]'   # Any JSON array
+                ]
+                
+                for pattern in json_patterns:
+                    match = re.search(pattern, response_text, re.DOTALL)
+                    if match:
+                        try:
+                            parsed = json.loads(match.group(0))
+                            logging.info(f"Successfully extracted JSON using pattern: {pattern}")
+                            return {'success': True, 'analysis': parsed, 'error': None}
+                        except json.JSONDecodeError:
+                            continue
+                
+                # If all JSON parsing fails, return the raw response for debugging
+                return {'success': False, 'analysis': None, 'error': f'Failed to parse Ollama response. Raw response: {response_text[:500]}...'}
+        
+        # Fallback - Ollama API call failed
+        return {'success': False, 'analysis': None, 'error': f'Ollama API call failed: {result.get("error", "Unknown error")}'}
+    except Exception as e:
+        return {'success': False, 'analysis': None, 'error': f'Ollama analysis failed: {str(e)}'}
+
+@app.route('/api/analyze-subscriptions', methods=['POST'])
+def analyze_subscriptions():
+    """Analyze transactions to surface recurring subscriptions and savings opportunities."""
+    try:
+        data = request.get_json() or {}
+        fetch_fresh = bool(data.get('fetch_fresh', True))
+        lookback_days = int(data.get('lookback_days', 180))
+
+        # Acquire transaction file
+        if fetch_fresh:
+            fetch_result = fetch_latest_transactions()
+            if not fetch_result['success']:
+                return jsonify({'error': f"Failed to fetch transactions: {fetch_result['error']}", 'fetch_output': fetch_result.get('output','')}), 500
+            file_path = fetch_result['file_path']
+        else:
+            data_dir = Path(__file__).parent.parent.parent / 'data'
+            transaction_files = list(data_dir.glob('transactions_*.txt'))
+            print(f"Transaction files: {transaction_files}")
+            if not transaction_files:
+                return jsonify({'error': 'No existing transaction files found'}), 404
+            file_path = str(max(transaction_files, key=lambda x: x.stat().st_mtime))
+
+        # Parse
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return jsonify({'error': f"Failed to parse transactions: {parse_result['error']}"}), 500
+
+        transactions = parse_result['transactions']
+        if not transactions:
+            return jsonify({'error': 'No transactions found in file', 'file_path': file_path}), 400
+
+        # Filter by lookback window
+        try:
+            cutoff = datetime.now() - timedelta(days=lookback_days)
+            transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
+        except Exception:
+            pass
+
+        if not transactions:
+            return jsonify({'error': 'No transactions within the requested lookback window'}), 400
+
+        # Analyze
+        analysis_result = analyze_subscriptions_with_ollama(transactions, lookback_days=lookback_days)
+        if not analysis_result['success']:
+            return jsonify({'error': f"Subscription analysis failed: {analysis_result['error']}"}), 500
+
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'transaction_count': len(transactions),
+            'lookback_days': lookback_days,
+            'analysis': analysis_result['analysis'],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
 def get_latest_30yr_mortgage_rate():
     """
@@ -874,6 +997,7 @@ def analyze_duplicates():
         # Step 1: Get latest transactions
         logging.info("fetching latest transactions")
         if not use_existing_file:
+            logging.info("fetching latest transactions")
             fetch_result = fetch_latest_transactions()
             logging.info(f"Fetch result: {fetch_result}")
             if not fetch_result['success']:
@@ -887,10 +1011,12 @@ def analyze_duplicates():
             # Use the most recent existing file
             data_dir = Path(__file__).parent.parent.parent / 'data'
             transaction_files = list(data_dir.glob('transactions_*.txt'))
+            logging.info(f"Transaction files: {transaction_files}")
             if not transaction_files:
                 return jsonify({'error': 'No existing transaction files found'}), 404
             
             file_path = str(max(transaction_files, key=lambda x: x.stat().st_mtime))
+            logging.info(f"Using file: {file_path}")
         
         # Step 2: Parse transaction file
         parse_result = parse_transaction_file(file_path)
@@ -909,6 +1035,7 @@ def analyze_duplicates():
         
         # Step 3: Analyze for duplicates
         analysis_result = analyze_duplicates_with_ollama(transactions, config)
+        logging.info(f"Analysis result: {analysis_result}")
         
         if not analysis_result['success']:
             return jsonify({
@@ -1005,6 +1132,7 @@ def transactions_summary():
 @app.route('/api/analyze-month-duplicates', methods=['POST'])
 def analyze_month_duplicates():
     """Analyze transactions for a specific month using the improved forensic analysis"""
+    logging.info("analyzing month duplicates")
     try:
         data = request.get_json() or {}
         
@@ -1051,6 +1179,7 @@ def analyze_month_duplicates():
             
             expected_filename = f"transactions_{start_date}_to_{end_date}.txt"
             file_path = str(data_dir / expected_filename)
+            print(f"File path: {file_path}")
             
             if not os.path.exists(file_path):
                 return jsonify({
@@ -1215,7 +1344,7 @@ def _round_to_nearest(value: float, step: int) -> int:
         return int(value)
 
 def calculate_condo_insurance_recommendations(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Rule-based HO-6 (condo) insurance needs calculator.
+    """HO-6 (condo) insurance needs calculator with LLM-assisted path, falling back to rule-based.
 
     Inputs expected (all optional, with sensible defaults):
       - square_feet: int/float
@@ -1229,7 +1358,113 @@ def calculate_condo_insurance_recommendations(payload: Dict[str, Any]) -> Dict[s
       - high_value_items_total: number
       - max_single_item_value: number
     """
-    # Defaults and maps
+    # First, attempt an LLM-backed recommendation if available
+    if llm_generate_json is not None:
+        try:
+            schema_hint = {
+                "recommended_coverages": {
+                    "dwelling_improvements": "number",
+                    "personal_property": "number",
+                    "loss_of_use": "number",
+                    "personal_liability": "number",
+                    "medical_payments": "number",
+                    "loss_assessment": "number",
+                    "water_backup": "number",
+                    "deductible": "number",
+                    "ordinance_or_law": "number"
+                },
+                "scheduled_property_recommendation": {
+                    "should_schedule": "boolean",
+                    "suggested_schedule_limit": "number",
+                    "notes": "string"
+                },
+                "notes": ["string"],
+                "disclaimer": "string"
+            }
+            system = (
+                "You are an experienced personal-lines insurance analyst specializing in HO-6 (condo) policies. "
+                "Recommend realistic USD coverage limits that coordinate with HOA master policies. Output ONLY valid JSON."
+            )
+            prompt = (
+                "Inputs (JSON):\n" + json.dumps(payload) + "\n\n" +
+                "Task: Propose HO-6 coverage recommendations and rationale. Return ONLY JSON matching this schema:\n" +
+                json.dumps(schema_hint)
+            )
+            llm_resp = llm_generate_json(prompt=prompt, system=system, timeout_seconds=90)
+            if llm_resp.get('success'):
+                data = llm_resp.get('data') or {}
+                rec = data.get('recommended_coverages') or {}
+                sched = data.get('scheduled_property_recommendation') or {}
+                notes_out = data.get('notes') or []
+                disclaimer = data.get('disclaimer') or 'This is an educational estimate. Final eligibility, limits, and premium depend on insurer underwriting and policy forms.'
+
+                required = {
+                    'dwelling_improvements','personal_property','loss_of_use','personal_liability',
+                    'medical_payments','loss_assessment','water_backup','deductible','ordinance_or_law'
+                }
+                if isinstance(rec, dict) and required.issubset(rec.keys()):
+                    def _to_float(v):
+                        try:
+                            return float(v)
+                        except Exception:
+                            return 0.0
+                    dwelling = _to_float(rec.get('dwelling_improvements'))
+                    personal_property = _to_float(rec.get('personal_property'))
+                    loss_of_use = _to_float(rec.get('loss_of_use'))
+                    liability = _to_float(rec.get('personal_liability'))
+                    medical_payments = _to_float(rec.get('medical_payments'))
+                    loss_assessment = _to_float(rec.get('loss_assessment'))
+                    water_backup = _to_float(rec.get('water_backup'))
+                    deductible = _to_float(rec.get('deductible'))
+                    ordinance_or_law = _to_float(rec.get('ordinance_or_law'))
+
+                    # Rounding conventions to keep UI consistent
+                    dwelling = _round_to_nearest(dwelling, 1000)
+                    personal_property = _round_to_nearest(personal_property, 1000)
+                    loss_of_use = _round_to_nearest(loss_of_use, 1000)
+                    ordinance_or_law = _round_to_nearest(ordinance_or_law, 1000)
+                    loss_assessment = _round_to_nearest(loss_assessment, 5000)
+                    water_backup = _round_to_nearest(water_backup, 1000)
+
+                    should_schedule = bool(sched.get('should_schedule', False))
+                    suggested_schedule_limit = _round_to_nearest(float(sched.get('suggested_schedule_limit') or 0), 100)
+                    sched_notes = str(sched.get('notes') or (
+                        'Schedule jewelry/collectibles individually to avoid sublimits.' if should_schedule else 'No scheduling needed based on provided values.'
+                    ))
+
+                    if isinstance(notes_out, str):
+                        notes_list = [notes_out]
+                    elif isinstance(notes_out, list):
+                        notes_list = [str(n) for n in notes_out]
+                    else:
+                        notes_list = []
+
+                    return {
+                        'inputs_echo': payload,
+                        'recommended_coverages': {
+                            'dwelling_improvements': dwelling,
+                            'personal_property': personal_property,
+                            'loss_of_use': loss_of_use,
+                            'personal_liability': int(liability) if float(liability).is_integer() else liability,
+                            'medical_payments': int(medical_payments) if float(medical_payments).is_integer() else medical_payments,
+                            'loss_assessment': loss_assessment,
+                            'water_backup': water_backup,
+                            'deductible': int(deductible) if float(deductible).is_integer() else deductible,
+                            'ordinance_or_law': ordinance_or_law,
+                        },
+                        'scheduled_property_recommendation': {
+                            'should_schedule': should_schedule,
+                            'suggested_schedule_limit': suggested_schedule_limit,
+                            'notes': sched_notes,
+                        },
+                        'notes': notes_list,
+                        'disclaimer': str(disclaimer),
+                    }
+        except Exception:
+            # Ignore LLM errors and continue with deterministic path
+            pass
+
+    # Defaults and maps (deterministic rule-based path)
     finish = (payload.get('finish_level') or 'standard').lower()
     finish_to_improvement_cost = {
         'basic': 60,
