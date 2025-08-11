@@ -503,7 +503,14 @@ Here is the transaction data:
 
 Please analyze this data and return ONLY valid JSON output with no additional text or explanation outside the JSON."""
     
-    result = generate_json(prompt)
+    if llm_generate_json is None:
+        return {
+            'success': False,
+            'analysis': {},
+            'error': 'Ollama integration not available'
+        }
+    
+    result = llm_generate_json(prompt)
     
     if result['success']:
         return {
@@ -641,7 +648,14 @@ Here is the transaction data:
 
 Please analyze this data and return ONLY valid JSON output with no additional text or explanation outside the JSON."""
     
-    result = generate_json(prompt)
+    if llm_generate_json is None:
+        return {
+            'success': False,
+            'analysis': {},
+            'error': 'Ollama integration not available'
+        }
+    
+    result = llm_generate_json(prompt)
     
     if result['success']:
         return {
@@ -732,9 +746,21 @@ Transactions CSV:
 Return ONLY JSON, no extra text.
 """
 
-        result = generate_json(prompt)
+        if llm_generate_json is None:
+            return {
+                'success': False,
+                'analysis': {},
+                'error': 'Ollama integration not available'
+            }
+        
+        result = llm_generate_json(prompt)
         logging.info(f"Ollama result: {result}")
         if result.get('success'):
+            # For the new llms module, the response is in 'data' not 'response'
+            if 'data' in result:
+                return {'success': True, 'analysis': result['data'], 'error': None}
+            
+            # Fallback for older response format
             response_text = result.get('response', '')
             logging.info(f"Ollama response text: {response_text[:500]}...")
             try:
