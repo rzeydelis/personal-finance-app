@@ -322,9 +322,10 @@ def call_ollama_api(prompt, model=None):
                 "model": model,
                 "prompt": prompt,
                 "stream": False,
-                "format": "json"
+                "format": "json",
+                "keep_alive": "10m"
             },
-            timeout=60
+            timeout=180
         )
         response.raise_for_status()
         
@@ -365,7 +366,8 @@ def fetch_latest_transactions():
         # if result.returncode == 0:
         if True:
             # Find the most recent transaction file
-            transaction_files = list(Path(__file__).parent.parent.parent / 'data' / 'transactions_*.txt')
+            data_dir = Path(__file__).parent.parent.parent / 'data'
+            transaction_files = list(data_dir.glob('transactions_*.txt'))
             if transaction_files:
                 latest_file = max(transaction_files, key=lambda x: x.stat().st_mtime)
                 return {
@@ -526,28 +528,63 @@ Please analyze this data and return ONLY valid JSON output with no additional te
         }
 
 def fetch_transactions_by_month(year, month):
-    """Hardcoded to return the existing transactions_2025-07-01_to_2025-07-30.txt file"""
+    """Fetch transactions for a specific month or return the most recent available file"""
     try:
-        # Hardcode to always return the July 2025 file
+        from calendar import monthrange
         data_dir = Path(__file__).parent.parent.parent / 'data'
-        hardcoded_file = data_dir / 'transactions_2025-07-01_to_2025-07-30.txt'
         
-        if hardcoded_file.exists():
+        # Calculate the exact month range
+        start_date = datetime(year, month, 1).date()
+        _, last_day = monthrange(year, month)
+        end_date = datetime(year, month, last_day).date()
+        
+        # First, try to find an existing file for this exact month
+        expected_filename = f"transactions_{start_date}_to_{end_date}.txt"
+        exact_file = data_dir / expected_filename
+        
+        if exact_file.exists():
             return {
                 'success': True,
-                'file_path': str(hardcoded_file),
-                'output': f'Using hardcoded transaction file for {year}-{month:02d}',
-                'start_date': '2025-07-01',
-                'end_date': '2025-07-30',
+                'file_path': str(exact_file),
+                'output': f'Found existing transaction file for {year}-{month:02d}',
+                'start_date': str(start_date),
+                'end_date': str(end_date),
+                'error': None
+            }
+        
+        # If no exact file, try to fetch fresh data using the main fetch function
+        # This will get the latest transactions and we'll filter them later
+        fetch_result = fetch_latest_transactions()
+        
+        if fetch_result['success']:
+            return {
+                'success': True,
+                'file_path': fetch_result['file_path'],
+                'output': f'Using latest transaction file (will be filtered to {year}-{month:02d})',
+                'start_date': str(start_date),
+                'end_date': str(end_date),
                 'error': None
             }
         else:
-            return {
-                'success': False,
-                'file_path': None,
-                'output': '',
-                'error': f'Hardcoded transaction file not found: {hardcoded_file}'
-            }
+            # Last fallback: use any available transaction file
+            transaction_files = list(data_dir.glob('transactions_*.txt'))
+            if transaction_files:
+                latest_file = max(transaction_files, key=lambda x: x.stat().st_mtime)
+                return {
+                    'success': True,
+                    'file_path': str(latest_file),
+                    'output': f'Using most recent available transaction file (will be filtered to {year}-{month:02d})',
+                    'start_date': str(start_date),
+                    'end_date': str(end_date),
+                    'error': None
+                }
+            else:
+                return {
+                    'success': False,
+                    'file_path': None,
+                    'output': '',
+                    'error': f'No transaction files found. Please run the transaction fetching script first or check your Plaid configuration.'
+                }
     
     except Exception as e:
         return {
@@ -565,6 +602,12 @@ def analyze_monthly_duplicates_with_ollama(transactions, safe_merchants=None, co
     
     if commute_times is None:
         commute_times = "Morning: 6:00-10:00 AM, Evening: 4:00-8:00 PM"
+    
+    # Limit transactions to avoid timeouts (process in chunks if needed)
+    max_transactions = 200  # Limit to prevent timeout
+    if len(transactions) > max_transactions:
+        transactions = transactions[:max_transactions]
+        logging.info(f"Limited transaction analysis to {max_transactions} most recent transactions to prevent timeout")
     
     # Convert transactions to CSV format for the prompt
     csv_data = "Date,PostedTime,Merchant,Category,Amount,Currency,TransactionID,Memo\n"
@@ -899,6 +942,12 @@ def plaid_demo():
     web_dir = Path(__file__).parent
     return send_from_directory(str(web_dir), 'plaid_link_demo.html')
 
+@app.route('/quick-access')
+def quick_access():
+    """Serve the simplified quick bank access page"""
+    web_dir = Path(__file__).parent
+    return send_from_directory(str(web_dir), 'quick_bank_access.html')
+
 @app.route('/api/mortgage-data')
 def get_mortgage_data():
     # Your current mortgage rate
@@ -1177,15 +1226,25 @@ def analyze_month_duplicates():
             _, last_day = monthrange(year, month)
             end_date = datetime(year, month, last_day).date()
             
+            # First, try to find the exact monthly file
             expected_filename = f"transactions_{start_date}_to_{end_date}.txt"
-            file_path = str(data_dir / expected_filename)
-            print(f"File path: {file_path}")
+            expected_path = data_dir / expected_filename
             
-            if not os.path.exists(file_path):
-                return jsonify({
-                    'error': f'No existing transaction file found for {year}-{month:02d}. Try with fetch_fresh=true.',
-                    'expected_file': expected_filename
-                }), 404
+            if expected_path.exists():
+                file_path = str(expected_path)
+            else:
+                # Fallback: Use the most recent transaction file and filter by date later
+                transaction_files = list(data_dir.glob('transactions_*.txt'))
+                if not transaction_files:
+                    return jsonify({
+                        'error': f'No transaction files found in data directory. Try with fetch_fresh=true.',
+                        'expected_file': expected_filename,
+                        'note': 'No transaction files exist - you may need to fetch fresh data first'
+                    }), 404
+                
+                # Use the most recent file
+                file_path = str(max(transaction_files, key=lambda x: x.stat().st_mtime))
+                logging.info(f"Using most recent transaction file: {file_path}")
             
             date_range = {
                 'start_date': str(start_date),
@@ -1219,17 +1278,34 @@ def analyze_month_duplicates():
         try:
             start_dt = datetime.strptime(date_range['start_date'], '%Y-%m-%d').date()
             end_dt = datetime.strptime(date_range['end_date'], '%Y-%m-%d').date()
-            transactions = [t for t in transactions if start_dt <= t['datetime'].date() <= end_dt]
-        except Exception:
+            original_count = len(transactions)
+            transactions = [t for t in transactions if t.get('datetime') and start_dt <= t['datetime'].date() <= end_dt]
+            filtered_count = len(transactions)
+            logging.info(f"Filtered transactions from {original_count} to {filtered_count} for date range {start_dt} to {end_dt}")
+        except Exception as e:
             # If parsing fails for any reason, continue with unfiltered list
+            logging.warning(f"Failed to filter transactions by date: {e}")
             pass
         
         if not transactions:
-            return jsonify({
-                'error': f'No transactions found for {year}-{month:02d}',
-                'file_path': file_path,
-                'date_range': date_range
-            }), 400
+            # Check if this is a future month issue
+            current_date = datetime.now().date()
+            requested_start = datetime.strptime(date_range['start_date'], '%Y-%m-%d').date()
+            
+            if requested_start > current_date:
+                return jsonify({
+                    'error': f'No transactions found for {year}-{month:02d} - this appears to be a future month. Please select a past month or the current month.',
+                    'file_path': file_path,
+                    'date_range': date_range,
+                    'suggestion': f'Try analyzing a recent month like {current_date.strftime("%Y-%m")} instead.'
+                }), 400
+            else:
+                return jsonify({
+                    'error': f'No transactions found for {year}-{month:02d} in available data.',
+                    'file_path': file_path,
+                    'date_range': date_range,
+                    'suggestion': 'Try fetching fresh data with "fetch_fresh=true" or select a different month.'
+                }), 400
         
         # Step 3: Analyze for duplicates using the improved prompt
         analysis_result = analyze_monthly_duplicates_with_ollama(
@@ -1602,6 +1678,239 @@ def condo_insurance_recommendations():
         return jsonify({'success': True, **result})
     except Exception as e:
         return jsonify({'success': False, 'error': f'Failed to calculate recommendations: {str(e)}'}), 400
+
+@app.route('/api/quick-bank-access', methods=['POST'])
+def quick_bank_access():
+    """
+    Condensed bank statement access endpoint that combines multiple steps:
+    1. Creates link token (if needed)
+    2. Fetches latest transactions 
+    3. Runs basic analysis (duplicates, subscriptions)
+    4. Returns comprehensive results in one call
+    """
+    try:
+        data = request.get_json() or {}
+        include_analysis = data.get('include_analysis', True)
+        analysis_types = data.get('analysis_types', ['duplicates', 'subscriptions'])
+        use_existing_data = data.get('use_existing_data', False)
+        
+        response_data = {
+            'success': True,
+            'timestamp': datetime.now().isoformat(),
+            'steps_completed': [],
+            'results': {}
+        }
+        
+        # Step 1: Fetch transactions (or use existing)
+        if use_existing_data:
+            # Use most recent existing transaction file
+            data_dir = Path(__file__).parent.parent.parent / 'data'
+            transaction_files = list(data_dir.glob('transactions_*.txt'))
+            if not transaction_files:
+                return jsonify({
+                    'success': False,
+                    'error': 'No existing transaction files found. Set use_existing_data=false to fetch fresh data.'
+                }), 404
+            
+            file_path = str(max(transaction_files, key=lambda x: x.stat().st_mtime))
+            response_data['steps_completed'].append('Used existing transaction data')
+        else:
+            # Fetch fresh transactions
+            fetch_result = fetch_latest_transactions()
+            if not fetch_result['success']:
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to fetch transactions: {fetch_result["error"]}',
+                    'details': fetch_result
+                }), 500
+            
+            file_path = fetch_result['file_path']
+            response_data['steps_completed'].append('Fetched fresh transactions')
+        
+        # Step 2: Parse transactions
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to parse transactions: {parse_result["error"]}'
+            }), 500
+        
+        transactions = parse_result['transactions']
+        response_data['results']['transaction_summary'] = {
+            'file_path': file_path,
+            'transaction_count': len(transactions),
+            'date_range': {
+                'earliest': min([t['date'] for t in transactions]) if transactions else None,
+                'latest': max([t['date'] for t in transactions]) if transactions else None
+            }
+        }
+        response_data['steps_completed'].append(f'Parsed {len(transactions)} transactions')
+        
+        # Step 3: Run requested analyses
+        if include_analysis and transactions:
+            analysis_results = {}
+            
+            # Duplicate analysis
+            if 'duplicates' in analysis_types:
+                try:
+                    dup_result = analyze_duplicates_with_ollama(transactions)
+                    if dup_result['success']:
+                        analysis_results['duplicates'] = dup_result['analysis']
+                        response_data['steps_completed'].append('Completed duplicate analysis')
+                    else:
+                        analysis_results['duplicates'] = {'error': dup_result['error']}
+                        response_data['steps_completed'].append('Duplicate analysis failed')
+                except Exception as e:
+                    analysis_results['duplicates'] = {'error': str(e)}
+                    response_data['steps_completed'].append(f'Duplicate analysis error: {str(e)}')
+            
+            # Subscription analysis
+            if 'subscriptions' in analysis_types:
+                try:
+                    # Filter to last 180 days for subscription analysis
+                    cutoff = datetime.now() - timedelta(days=180)
+                    recent_transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
+                    
+                    sub_result = analyze_subscriptions_with_ollama(recent_transactions, lookback_days=180)
+                    if sub_result['success']:
+                        analysis_results['subscriptions'] = sub_result['analysis']
+                        response_data['steps_completed'].append('Completed subscription analysis')
+                    else:
+                        analysis_results['subscriptions'] = {'error': sub_result['error']}
+                        response_data['steps_completed'].append('Subscription analysis failed')
+                except Exception as e:
+                    analysis_results['subscriptions'] = {'error': str(e)}
+                    response_data['steps_completed'].append(f'Subscription analysis error: {str(e)}')
+            
+            response_data['results']['analysis'] = analysis_results
+        
+        # Step 4: Generate summary insights
+        if transactions:
+            total_transactions = len(transactions)
+            total_amount = sum([abs(t['amount']) for t in transactions if t.get('amount')])
+            avg_transaction = total_amount / total_transactions if total_transactions > 0 else 0
+            
+            response_data['results']['insights'] = {
+                'total_transactions': total_transactions,
+                'total_amount_processed': round(total_amount, 2),
+                'average_transaction_amount': round(avg_transaction, 2),
+                'analysis_included': include_analysis,
+                'analysis_types_requested': analysis_types if include_analysis else []
+            }
+            response_data['steps_completed'].append('Generated summary insights')
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Quick bank access failed: {str(e)}',
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/create-link-token', methods=['POST'])
+def create_link_token_api():
+    """
+    API endpoint to create Plaid link token for frontend integration
+    """
+    try:
+        # Import here to avoid circular imports
+        import sys
+        sys.path.append(str(Path(__file__).parent.parent / 'api'))
+        
+        try:
+            from link_token_create import create_link_token  # type: ignore
+            
+            data = request.get_json() or {}
+            user_id = data.get('user_id', 'default_user_123')
+            
+            link_token = create_link_token(user_id)
+            
+            if link_token:
+                return jsonify({
+                    'success': True,
+                    'link_token': link_token,
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to create link token'
+                }), 500
+                
+        except ImportError as e:
+            return jsonify({
+                'success': False,
+                'error': f'Link token creation module not available: {str(e)}'
+            }), 500
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Unexpected error creating link token: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to create link token: {str(e)}'
+        }), 500
+
+@app.route('/api/exchange-token', methods=['POST'])
+def exchange_token_api():
+    """
+    API endpoint to exchange public token for access token
+    """
+    try:
+        data = request.get_json() or {}
+        public_token = data.get('public_token')
+        
+        if not public_token:
+            return jsonify({
+                'success': False,
+                'error': 'public_token is required'
+            }), 400
+        
+        # Import here to avoid circular imports
+        import sys
+        sys.path.append(str(Path(__file__).parent.parent / 'api'))
+        
+        try:
+            from exchange_token import exchange_public_token  # type: ignore
+            
+            access_token, item_id = exchange_public_token(public_token)
+            
+            if access_token:
+                # Optionally save to environment or config file
+                # For now, just return it
+                return jsonify({
+                    'success': True,
+                    'access_token': access_token,
+                    'item_id': item_id,
+                    'timestamp': datetime.now().isoformat(),
+                    'note': 'Save this access token to your .env file as PLAID_ACCESS_TOKEN'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to exchange public token'
+                }), 500
+                
+        except ImportError as e:
+            return jsonify({
+                'success': False,
+                'error': f'Token exchange module not available: {str(e)}'
+            }), 500
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Unexpected error exchanging token: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to exchange token: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 

@@ -22,7 +22,7 @@ env_mapping = {
     'production': plaid.Environment.production
 }
 
-PLAID_ENV = env_mapping.get(PLAID_ENV_NAME.lower(), plaid.Environment.sandbox)
+PLAID_ENV = env_mapping.get(PLAID_ENV_NAME.lower(), plaid.Environment.production)
 
 # Validate required environment variables
 if not all([PLAID_CLIENT_ID, PLAID_SECRET, ACCESS_TOKEN]):

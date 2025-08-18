@@ -6,8 +6,8 @@ from plaid.api import plaid_api
 from datetime import datetime, timedelta
 from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables from .env file (robust to cwd changes)
-load_dotenv(find_dotenv(), override=True)
+# Skip loading .env files for security - use system environment variables only
+# load_dotenv(find_dotenv(), override=True)  # Commented out for security
 
 # 1. Load Plaid API configuration from environment variables
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
