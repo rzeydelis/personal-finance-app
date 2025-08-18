@@ -72,7 +72,7 @@ def _extract_json_maybe(text: str) -> Optional[Any]:
     return None
 
 
-def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str] = None, timeout_seconds: int = 90) -> Dict[str, Any]:
+def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str] = None, timeout_seconds: int = 300) -> Dict[str, Any]:
     """Call Ollama to generate valid JSON.
 
     Returns a dict: { success: bool, data: Any, raw_text: str, error: Optional[str] }
@@ -83,6 +83,7 @@ def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str
         "stream": False,
         # Ollama's `format: "json"` nudges the model to emit JSON; still validate client-side.
         "format": "json",
+        "keep_alive": "15m",
     }
 
     ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout_seconds)
