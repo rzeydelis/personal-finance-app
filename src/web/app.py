@@ -37,12 +37,13 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 # Local LLM client (Ollama). Optional: falls back to rule-based if unavailable
 try:
-    from .llms import generate_json as llm_generate_json
+    from .llms import generate_json as llm_generate_json, generate_text as llm_generate_text
 except Exception:
     try:
-        from llms import generate_json as llm_generate_json
+        from llms import generate_json as llm_generate_json, generate_text as llm_generate_text
     except Exception:
         llm_generate_json = None
+        llm_generate_text = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -1177,6 +1178,45 @@ def transactions_summary():
     
     except Exception as e:
         return jsonify({'error': f'Failed to get summary: {str(e)}'}), 500
+
+@app.route('/api/ask-transactions', methods=['POST'])
+def ask_transactions():
+    """Answer natural language questions using bank transaction data via LLM"""
+    data = request.get_json() or {}
+    question = data.get('question', '').strip()
+    if not question:
+        return jsonify({'success': False, 'error': 'Question is required'}), 400
+
+    fetch_result = fetch_latest_transactions()
+    if not fetch_result['success']:
+        return jsonify({'success': False, 'error': fetch_result['error']}), 500
+
+    parse_result = parse_transaction_file(fetch_result['file_path'])
+    if not parse_result['success']:
+        return jsonify({'success': False, 'error': parse_result['error']}), 500
+
+    transactions = parse_result['transactions']
+    if not transactions:
+        return jsonify({'success': False, 'error': 'No transactions available'}), 400
+
+    formatted = "\n".join(
+        f"{t['date']} | {t['name']} | ${t['amount']}" for t in transactions[:100]
+    )
+
+    prompt = (
+        "You are a helpful financial assistant. Using only the transactions provided, "
+        "answer the user's question.\n"
+        f"Transactions:\n{formatted}\n\nQuestion: {question}\nAnswer:"
+    )
+
+    if llm_generate_text is None:
+        return jsonify({'success': False, 'error': 'LLM not configured'}), 500
+
+    result = llm_generate_text(prompt=prompt)
+    if result.get('success'):
+        return jsonify({'success': True, 'answer': result.get('text', '').strip()})
+    else:
+        return jsonify({'success': False, 'error': result.get('error', 'LLM request failed')}), 500
 
 @app.route('/api/analyze-month-duplicates', methods=['POST'])
 def analyze_month_duplicates():

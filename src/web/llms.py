@@ -29,9 +29,10 @@ def generate_text(prompt: str, model: Optional[str] = None, stream: bool = False
 
     Returns a dict: { success: bool, text: str, error: Optional[str] }
     """
+    prefix = f"{system}\n\n" if system else ""
     payload = {
         "model": model or OLLAMA_MODEL,
-        "prompt": f"{system + '\n\n' if system else ''}{prompt}",
+        "prompt": f"{prefix}{prompt}",
         "stream": bool(stream),
     }
 
@@ -77,9 +78,10 @@ def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str
 
     Returns a dict: { success: bool, data: Any, raw_text: str, error: Optional[str] }
     """
+    prefix = f"{system}\n\n" if system else ""
     payload = {
         "model": model or OLLAMA_MODEL,
-        "prompt": f"{system + '\n\n' if system else ''}{prompt}",
+        "prompt": f"{prefix}{prompt}",
         "stream": False,
         # Ollama's `format: "json"` nudges the model to emit JSON; still validate client-side.
         "format": "json",
