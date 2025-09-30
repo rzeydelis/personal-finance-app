@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Any
 from statistics import mean
 import logging
+import importlib
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -31,7 +32,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Ollama configuration
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:4b')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:latest')
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
@@ -837,6 +838,112 @@ Return ONLY JSON, no extra text.
     except Exception as e:
         return {'success': False, 'analysis': None, 'error': f'Ollama analysis failed: {str(e)}'}
 
+def generate_personal_finance_tip_with_ollama(transactions, user_profile=None):
+    """Generate personalized finance tips based on transaction analysis"""
+    
+    try:
+        # Prepare transaction data for analysis
+        csv_data = "Date,Time,Merchant,Description,Amount,Category\n"
+        for trx in transactions:
+            csv_data += f"{trx['date']},{trx.get('time','')},{trx.get('merchant','')},{trx.get('description','')},{trx.get('amount',0)},{trx.get('category', 'Other')}\n"
+
+        # Calculate some basic statistics for context
+        total_spending = sum([abs(float(t.get('amount', 0))) for t in transactions if float(t.get('amount', 0)) < 0])
+        transaction_count = len(transactions)
+        avg_transaction = total_spending / transaction_count if transaction_count > 0 else 0
+        
+        # Prepare user context
+        user_context = ""
+        if user_profile:
+            user_context = f"User Profile: {json.dumps(user_profile)}\n"
+
+        prompt = f"""
+You are a personal finance advisor analyzing transaction data to provide actionable financial tips. 
+
+{user_context}
+
+Transaction Analysis Context:
+- Total transactions analyzed: {transaction_count}
+- Total spending amount: ${total_spending:.2f}
+- Average transaction amount: ${avg_transaction:.2f}
+- Time period: Recent transactions
+
+Based on the transaction data below, provide ONE specific, actionable personal finance tip that would be most beneficial for this user. Focus on practical advice they can implement immediately.
+
+Guidelines:
+- Analyze spending patterns, categories, and frequency
+- Look for optimization opportunities (subscriptions, dining, shopping, etc.)
+- Consider cash flow patterns and timing
+- Provide specific dollar amounts or percentages when relevant
+- Make the tip actionable with clear next steps
+- Keep it concise but valuable (2-3 sentences max)
+
+Output strictly as JSON with this schema:
+{{
+  "tip": {{
+    "title": "<short descriptive title>",
+    "advice": "<main actionable advice>",
+    "reasoning": "<why this tip applies to their spending>",
+    "potential_savings": "<estimated savings if applicable>",
+    "category": "<category like 'budgeting', 'subscriptions', 'dining', 'debt', 'savings'>",
+    "actionable_steps": ["<step 1>", "<step 2>", "<step 3>"],
+    "confidence": <0-100 confidence level>
+  }},
+  "spending_insights": {{
+    "top_spending_category": "<category with highest spending>",
+    "frequent_merchants": ["<merchant 1>", "<merchant 2>"],
+    "spending_trend": "<increasing/decreasing/stable>",
+    "notable_patterns": ["<pattern 1>", "<pattern 2>"]
+  }}
+}}
+
+Transaction data:
+{csv_data}
+
+Return ONLY valid JSON, no extra text.
+"""
+
+        if llm_generate_json is None:
+            return {
+                'success': False,
+                'tip': None,
+                'error': 'LLM integration not available'
+            }
+        
+        result = llm_generate_json(prompt, timeout_seconds=120)
+        
+        if result.get('success'):
+            if 'data' in result:
+                return {'success': True, 'analysis': result['data'], 'error': None}
+            
+            # Fallback for older response format
+            response_text = result.get('response', '')
+            try:
+                parsed = json.loads(response_text)
+                return {'success': True, 'analysis': parsed, 'error': None}
+            except json.JSONDecodeError as e:
+                # Try to extract JSON block
+                json_patterns = [
+                    r'\{[\s\S]*?\}(?=\s*$|\s*\n\s*$)',
+                    r'\{[\s\S]*\}'
+                ]
+                
+                for pattern in json_patterns:
+                    match = re.search(pattern, response_text, re.DOTALL)
+                    if match:
+                        try:
+                            parsed = json.loads(match.group(0))
+                            return {'success': True, 'analysis': parsed, 'error': None}
+                        except json.JSONDecodeError:
+                            continue
+                
+                return {'success': False, 'analysis': None, 'error': f'Failed to parse LLM response: {response_text[:500]}...'}
+        
+        return {'success': False, 'analysis': None, 'error': f'LLM API call failed: {result.get("error", "Unknown error")}'}
+    
+    except Exception as e:
+        return {'success': False, 'analysis': None, 'error': f'Finance tip generation failed: {str(e)}'}
+
 @app.route('/api/analyze-subscriptions', methods=['POST'])
 def analyze_subscriptions():
     """Analyze transactions to surface recurring subscriptions and savings opportunities."""
@@ -894,6 +1001,68 @@ def analyze_subscriptions():
     except Exception as e:
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
+@app.route('/api/finance-tip', methods=['POST'])
+def get_finance_tip():
+    """Generate a personalized finance tip based on transaction analysis"""
+    try:
+        data = request.get_json() or {}
+        fetch_fresh = bool(data.get('fetch_fresh', True))
+        lookback_days = int(data.get('lookback_days', 90))
+        user_profile = data.get('user_profile', {})
+
+        # Step 1: Get transaction file
+        if fetch_fresh:
+            fetch_result = fetch_latest_transactions()
+            if not fetch_result['success']:
+                return jsonify({
+                    'error': f"Failed to fetch transactions: {fetch_result['error']}", 
+                    'fetch_output': fetch_result.get('output','')
+                }), 500
+            file_path = fetch_result['file_path']
+        else:
+            data_dir = Path(__file__).parent.parent.parent / 'data'
+            transaction_files = list(data_dir.glob('transactions_*.txt'))
+            if not transaction_files:
+                return jsonify({'error': 'No existing transaction files found'}), 404
+            file_path = str(max(transaction_files, key=lambda x: x.stat().st_mtime))
+
+        # Step 2: Parse transactions
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return jsonify({'error': f"Failed to parse transactions: {parse_result['error']}"}), 500
+
+        transactions = parse_result['transactions']
+        if not transactions:
+            return jsonify({'error': 'No transactions found in file', 'file_path': file_path}), 400
+
+        # Step 3: Filter by lookback window
+        try:
+            cutoff = datetime.now() - timedelta(days=lookback_days)
+            transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
+        except Exception:
+            pass
+
+        if not transactions:
+            return jsonify({'error': 'No transactions within the requested lookback window'}), 400
+
+        # Step 4: Generate finance tip
+        tip_result = generate_personal_finance_tip_with_ollama(transactions, user_profile)
+        if not tip_result['success']:
+            return jsonify({'error': f"Finance tip generation failed: {tip_result['error']}"}), 500
+
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'transaction_count': len(transactions),
+            'lookback_days': lookback_days,
+            'tip_analysis': tip_result['analysis'],
+            'user_profile': user_profile,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
+
 def get_latest_30yr_mortgage_rate():
     """
     Fetch the latest 30-year mortgage rate from FRED.
@@ -934,7 +1103,8 @@ def get_latest_30yr_mortgage_rate():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """Home serves the new Quick Access page template."""
+    return render_template('quick_access.html')
 
 @app.route('/plaid-demo')
 def plaid_demo():
@@ -944,9 +1114,18 @@ def plaid_demo():
 
 @app.route('/quick-access')
 def quick_access():
-    """Serve the simplified quick bank access page"""
-    web_dir = Path(__file__).parent
-    return send_from_directory(str(web_dir), 'quick_bank_access.html')
+    """Serve the Quick Access page (same as home)."""
+    return render_template('quick_access.html')
+
+@app.route('/dashboard')
+def dashboard():
+    """Keep the original dashboard available."""
+    return render_template('index.html')
+
+@app.route('/tip')
+def tip_page():
+    """Serve a minimal page that generates a single personal finance tip."""
+    return render_template('finance_tip.html')
 
 @app.route('/api/mortgage-data')
 def get_mortgage_data():
@@ -976,6 +1155,86 @@ def get_mortgage_data():
         'date': market_data['date'],
         'refinance_message': "Consider refinancing" if should_refinance else "Current rate difference doesn't warrant refinancing"
     })
+
+# ------------------------------
+# Spending Benchmarks
+# ------------------------------
+
+def _import_spending_benchmarks():
+    """Import spending benchmark helpers from src/api at runtime to avoid package issues."""
+    api_path = Path(__file__).parent.parent / 'api'
+    if str(api_path) not in sys.path:
+        sys.path.append(str(api_path))
+    try:
+        sb = importlib.import_module('spending_benchmarks')
+        return sb
+    except Exception as e:
+        raise RuntimeError(f"Failed to import spending_benchmarks: {e}")
+
+
+from typing import Optional, List
+
+
+def analyze_spending_benchmarks(transactions, state: Optional[str] = None, categories: Optional[List[str]] = None):
+    """Aggregate monthly spend and compare to benchmarks for a region using the LLM (prompt-based)."""
+    sb = _import_spending_benchmarks()
+    user_spend = sb.monthly_spend_by_category(transactions)
+    try:
+        result = sb.generate_benchmark_comparison_with_llm(user_spend, state=state, categories=categories)
+    except Exception as e:
+        # Fallback to rough heuristics
+        result = sb.compare_to_benchmarks_rule_of_thumb(user_spend, state=state, categories=categories)
+    return result
+
+
+@app.route('/api/spending-benchmarks', methods=['POST'])
+def spending_benchmarks_api():
+    """
+    Compare this month's spending (or specified month) to benchmarks.
+    Body: { year, month, state, use_existing_data=true|false }
+    """
+    try:
+        data = request.get_json() or {}
+        year = int(data.get('year')) if data.get('year') else datetime.now().year
+        month = int(data.get('month')) if data.get('month') else datetime.now().month
+        state = data.get('state') or os.getenv('DEFAULT_STATE') or 'US'
+        use_existing = bool(data.get('use_existing_data', True))
+
+        # Acquire transactions for the requested month
+        fetch_result = fetch_transactions_by_month(year, month)
+        if not fetch_result['success']:
+            return jsonify({'success': False, 'error': fetch_result['error']}), 400
+
+        file_path = fetch_result['file_path']
+        date_range = {'start_date': fetch_result.get('start_date'), 'end_date': fetch_result.get('end_date')}
+
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return jsonify({'success': False, 'error': parse_result['error']}), 500
+
+        transactions = parse_result['transactions']
+        # Filter to month window
+        try:
+            start_dt = datetime.strptime(date_range['start_date'], '%Y-%m-%d').date()
+            end_dt = datetime.strptime(date_range['end_date'], '%Y-%m-%d').date()
+            transactions = [t for t in transactions if t.get('datetime') and start_dt <= t['datetime'].date() <= end_dt]
+        except Exception:
+            pass
+
+        if not transactions:
+            return jsonify({'success': False, 'error': 'No transactions in selected month', 'date_range': date_range}), 400
+
+        analysis = analyze_spending_benchmarks(transactions, state=state)
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'date_range': date_range,
+            'transaction_count': len(transactions),
+            'analysis': analysis,
+            'timestamp': datetime.now().isoformat(),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Benchmark analysis failed: {str(e)}'}), 500
 
 @app.route('/api/analyze-mortgage', methods=['POST'])
 def analyze_mortgage():
@@ -1691,8 +1950,10 @@ def quick_bank_access():
     try:
         data = request.get_json() or {}
         include_analysis = data.get('include_analysis', True)
-        analysis_types = data.get('analysis_types', ['duplicates', 'subscriptions'])
+        analysis_types = data.get('analysis_types', ['duplicates', 'subscriptions', 'finance_tip'])
         use_existing_data = data.get('use_existing_data', False)
+        user_profile = data.get('user_profile', {})
+        user_state = (data.get('state') or os.getenv('DEFAULT_STATE') or 'US')
         
         response_data = {
             'success': True,
@@ -1782,6 +2043,34 @@ def quick_bank_access():
                     analysis_results['subscriptions'] = {'error': str(e)}
                     response_data['steps_completed'].append(f'Subscription analysis error: {str(e)}')
             
+            # Finance tip analysis
+            if 'finance_tip' in analysis_types:
+                try:
+                    # Use last 90 days for finance tips
+                    cutoff = datetime.now() - timedelta(days=90)
+                    recent_transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
+                    
+                    tip_result = generate_personal_finance_tip_with_ollama(recent_transactions, user_profile)
+                    if tip_result['success']:
+                        analysis_results['finance_tip'] = tip_result['analysis']
+                        response_data['steps_completed'].append('Generated personalized finance tip')
+                    else:
+                        analysis_results['finance_tip'] = {'error': tip_result['error']}
+                        response_data['steps_completed'].append('Finance tip generation failed')
+                except Exception as e:
+                    analysis_results['finance_tip'] = {'error': str(e)}
+                    response_data['steps_completed'].append(f'Finance tip error: {str(e)}')
+            
+            # Benchmarks analysis
+            if 'benchmarks' in analysis_types:
+                try:
+                    bench_result = analyze_spending_benchmarks(transactions, state=user_state)
+                    analysis_results['benchmarks'] = bench_result
+                    response_data['steps_completed'].append('Completed benchmark comparison')
+                except Exception as e:
+                    analysis_results['benchmarks'] = {'error': str(e)}
+                    response_data['steps_completed'].append(f'Benchmark analysis error: {str(e)}')
+
             response_data['results']['analysis'] = analysis_results
         
         # Step 4: Generate summary insights

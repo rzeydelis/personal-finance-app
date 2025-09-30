@@ -202,6 +202,7 @@
                 <li>✅ Fetch your latest bank transactions</li>
                 <li>🔍 Analyze for duplicate charges</li>
                 <li>💰 Identify recurring subscriptions</li>
+                <li>💡 Generate personalized finance tips</li>
                 <li>📊 Generate comprehensive insights</li>
             </ul>
 
@@ -214,6 +215,10 @@
                 <label>
                     <input type="checkbox" id="includeSubscriptions" checked>
                     <span>💰 Subscription Detection</span>
+                </label>
+                <label>
+                    <input type="checkbox" id="includeFinanceTip" checked>
+                    <span>💡 Personal Finance Tips</span>
                 </label>
                 <label>
                     <input type="checkbox" id="useExisting" checked>
@@ -262,10 +267,12 @@
             const useExisting = document.getElementById('useExisting').checked;
             const includeDuplicates = document.getElementById('includeDuplicates').checked;
             const includeSubscriptions = document.getElementById('includeSubscriptions').checked;
+            const includeFinanceTip = document.getElementById('includeFinanceTip').checked;
             
             const analysisTypes = [];
             if (includeDuplicates) analysisTypes.push('duplicates');
             if (includeSubscriptions) analysisTypes.push('subscriptions');
+            if (includeFinanceTip) analysisTypes.push('finance_tip');
             
             await runQuickAnalysis(useExisting, analysisTypes);
         }
@@ -275,15 +282,17 @@
             
             const includeDuplicates = document.getElementById('includeDuplicates').checked;
             const includeSubscriptions = document.getElementById('includeSubscriptions').checked;
+            const includeFinanceTip = document.getElementById('includeFinanceTip').checked;
             
             const analysisTypes = [];
             if (includeDuplicates) analysisTypes.push('duplicates');
             if (includeSubscriptions) analysisTypes.push('subscriptions');
+            if (includeFinanceTip) analysisTypes.push('finance_tip');
             
             await runQuickAnalysis(false, analysisTypes); // Force fresh data
         }
 
-        async function runQuickAnalysis(useExisting = true, analysisTypes = ['duplicates', 'subscriptions']) {
+        async function runQuickAnalysis(useExisting = true, analysisTypes = ['duplicates', 'subscriptions', 'finance_tip']) {
             isProcessing = true;
             showLoading(true);
             hideResults();
@@ -565,6 +574,58 @@
                                 html += `<li><em>... and ${subscriptions.length - 5} more</em></li>`;
                             }
                             html += `</ul>`;
+                        }
+                    }
+                    html += `</div>`;
+                }
+
+                // Finance Tip Results
+                if (analysis.finance_tip) {
+                    html += `
+                        <div class="analysis-card">
+                            <h3>💡 Personal Finance Tip</h3>
+                    `;
+                    if (analysis.finance_tip.error) {
+                        html += `<p style="color: #dc3545;">Error: ${analysis.finance_tip.error}</p>`;
+                    } else {
+                        const tip = analysis.finance_tip.tip || {};
+                        const insights = analysis.finance_tip.spending_insights || {};
+                        
+                        html += `
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <h4 style="margin-top: 0; color: #007bff;">${tip.title || 'Finance Tip'}</h4>
+                                <p style="font-size: 1.1em; margin: 10px 0;"><strong>${tip.advice || 'No specific advice available'}</strong></p>
+                                <p style="color: #6c757d; font-size: 0.9em; margin: 10px 0;">${tip.reasoning || ''}</p>
+                                ${tip.potential_savings ? `<p style="color: #28a745; font-weight: 600;">💰 Potential Savings: ${tip.potential_savings}</p>` : ''}
+                            </div>
+                        `;
+
+                        if (tip.actionable_steps && tip.actionable_steps.length > 0) {
+                            html += `
+                                <h5>📋 Action Steps:</h5>
+                                <ol>
+                                    ${tip.actionable_steps.map(step => `<li>${step}</li>`).join('')}
+                                </ol>
+                            `;
+                        }
+
+                        if (insights.top_spending_category || insights.frequent_merchants) {
+                            html += `
+                                <div style="background: #f1f3f4; padding: 10px; border-radius: 6px; margin-top: 10px;">
+                                    <h6 style="margin: 0 0 8px 0;">📊 Spending Insights:</h6>
+                                    ${insights.top_spending_category ? `<p style="margin: 3px 0; font-size: 0.9em;">Top category: <strong>${insights.top_spending_category}</strong></p>` : ''}
+                                    ${insights.frequent_merchants && insights.frequent_merchants.length > 0 ? `<p style="margin: 3px 0; font-size: 0.9em;">Frequent merchants: ${insights.frequent_merchants.slice(0, 3).join(', ')}</p>` : ''}
+                                    ${insights.spending_trend ? `<p style="margin: 3px 0; font-size: 0.9em;">Spending trend: ${insights.spending_trend}</p>` : ''}
+                                </div>
+                            `;
+                        }
+
+                        if (tip.confidence) {
+                            html += `
+                                <div style="margin-top: 10px; font-size: 0.8em; color: #6c757d;">
+                                    Confidence: ${tip.confidence}%
+                                </div>
+                            `;
                         }
                     }
                     html += `</div>`;

@@ -7,7 +7,7 @@ import requests
 
 # Basic Ollama configuration via environment variables
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:4b')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:latest')
 
 
 def _post_ollama_generate(payload: Dict[str, Any], timeout_seconds: int = 60) -> Tuple[bool, Dict[str, Any], Optional[str]]:
@@ -29,9 +29,10 @@ def generate_text(prompt: str, model: Optional[str] = None, stream: bool = False
 
     Returns a dict: { success: bool, text: str, error: Optional[str] }
     """
+    newlines = "\n\n"
     payload = {
         "model": model or OLLAMA_MODEL,
-        "prompt": f"{system + '\n\n' if system else ''}{prompt}",
+        "prompt": f"{system + newlines if system else ''}{prompt}",
         "stream": bool(stream),
     }
 
@@ -77,9 +78,10 @@ def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str
 
     Returns a dict: { success: bool, data: Any, raw_text: str, error: Optional[str] }
     """
+    newlines = "\n\n"
     payload = {
         "model": model or OLLAMA_MODEL,
-        "prompt": f"{system + '\n\n' if system else ''}{prompt}",
+        "prompt": f"{system + newlines if system else ''}{prompt}",
         "stream": False,
         # Ollama's `format: "json"` nudges the model to emit JSON; still validate client-side.
         "format": "json",

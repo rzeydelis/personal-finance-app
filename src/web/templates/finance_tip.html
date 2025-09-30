@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Finance Tip</title>
+  <style>
+    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
+    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
+    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:14px 20px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+    .topbar .inner { max-width: 900px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; letter-spacing:.2px; }
+    .nav a { color:#e9f2ff; text-decoration:none; margin-left:16px; font-weight:600; }
+    .nav a:hover { text-decoration:underline; }
+    .wrap { max-width: 900px; margin: 26px auto; padding: 0 16px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,.08); padding:22px; }
+    .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .header h1 { margin:0; font-size:1.4rem; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; }
+    .toggle { display:flex; align-items:center; gap:8px; background:#f5f7fb; border:1px solid #e6eaef; padding:8px 10px; border-radius:10px; }
+    .num { width:90px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:10px; }
+    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); }
+    .btn:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; }
+    .btn-secondary { background:#eef2f7; color:#0b5ed7; border:1px solid #d8e1ee; }
+    .status { margin-top:10px; display:none; color:var(--muted); }
+    .spinner { width:32px; height:32px; border:3px solid #e9eef6; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; display:inline-block; vertical-align:middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .tip { margin-top:16px; display:none; }
+    .tip .title { font-weight:800; color:var(--brand); margin: 0 0 6px 0; }
+    .tip .advice { font-size:1.1rem; font-weight:700; margin:6px 0 6px 0; }
+    .tip .reason { color:var(--muted); margin: 4px 0 10px 0; }
+    .pill { display:inline-block; background:#e8f1ff; color:#0b5ed7; border:1px solid #cfe0ff; border-radius:999px; padding:6px 10px; font-weight:700; margin: 4px 0; }
+    .steps { margin-top:10px; }
+    .steps h3 { margin: 8px 0; font-size:1rem; }
+    .steps li { margin:6px 0; }
+    .insights { margin-top:12px; background:#f7f9fc; border:1px solid #e6eaef; border-radius:10px; padding:12px; color:#334155; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .grow { flex:1 1 auto; }
+  </style>
+  <script>
+    async function generateTip(fetchFresh) {
+      const status = document.getElementById('status');
+      const tipWrap = document.getElementById('tip');
+      const btn = document.getElementById('genBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const lookback = document.getElementById('lookback').value || 90;
+
+      tipWrap.style.display = 'none';
+      status.style.display = 'block';
+      status.innerHTML = '<span class="spinner"></span>Generating your personalized tip...';
+      btn.disabled = true; copyBtn.disabled = true;
+
+      try {
+        const resp = await fetch('/api/finance-tip', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fetch_fresh: !!fetchFresh, lookback_days: parseInt(lookback, 10) })
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Failed to generate tip');
+        const tip = (data.tip_analysis && data.tip_analysis.tip) || {};
+        const insights = (data.tip_analysis && data.tip_analysis.spending_insights) || {};
+
+        // Fill UI
+        document.getElementById('tipTitle').textContent = tip.title || 'Personal Finance Tip';
+        document.getElementById('tipAdvice').textContent = tip.advice || 'No advice available.';
+        document.getElementById('tipReason').textContent = tip.reasoning || '';
+        document.getElementById('tipSavings').textContent = tip.potential_savings ? `💰 ${tip.potential_savings}` : '';
+        document.getElementById('tipCategory').textContent = tip.category ? `#${tip.category}` : '';
+        document.getElementById('tipConfidence').textContent = tip.confidence != null ? `Confidence: ${tip.confidence}%` : '';
+        const steps = Array.isArray(tip.actionable_steps) ? tip.actionable_steps : [];
+        document.getElementById('stepsList').innerHTML = steps.map(s => `<li>${s}</li>`).join('') || '<li>No steps provided.</li>';
+        document.getElementById('insights').innerHTML = `
+          ${insights.top_spending_category ? `<div>Top category: <strong>${insights.top_spending_category}</strong></div>` : ''}
+          ${insights.frequent_merchants && insights.frequent_merchants.length ? `<div>Frequent merchants: ${insights.frequent_merchants.slice(0,3).join(', ')}</div>` : ''}
+          ${insights.spending_trend ? `<div>Spending trend: ${insights.spending_trend}</div>` : ''}
+        `;
+
+        tipWrap.style.display = 'block';
+        status.style.display = 'none';
+        btn.disabled = false; copyBtn.disabled = false;
+      } catch (e) {
+        status.innerHTML = `❌ ${e.message}`;
+        btn.disabled = false; copyBtn.disabled = true;
+      }
+    }
+
+    function copyTip() {
+      const title = document.getElementById('tipTitle').textContent;
+      const advice = document.getElementById('tipAdvice').textContent;
+      const reason = document.getElementById('tipReason').textContent;
+      const savings = document.getElementById('tipSavings').textContent;
+      const steps = Array.from(document.querySelectorAll('#stepsList li')).map(li => `- ${li.textContent}`).join('\n');
+      const text = `${title}\n\n${advice}\n${reason ? '\n' + reason : ''}\n${savings ? '\n' + savings : ''}\n\nSteps:\n${steps}`;
+      navigator.clipboard.writeText(text).then(() => {
+        const status = document.getElementById('status');
+        status.style.display = 'block';
+        status.textContent = '✅ Copied to clipboard';
+        setTimeout(() => status.style.display = 'none', 1500);
+      });
+    }
+  </script>
+  </head>
+<body>
+  <div class="topbar">
+    <div class="inner">
+      <div class="brand">💡 Finance Tip</div>
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <h1>Get a Personalized Finance Tip</h1>
+        <div class="row">
+          <label class="toggle"><input id="fresh" type="checkbox" /> Fetch fresh data</label>
+          <input id="lookback" class="num" type="number" min="7" max="365" value="90" title="Lookback days" />
+          <button id="genBtn" class="btn" onclick="generateTip(document.getElementById('fresh').checked)">Generate Tip</button>
+          <button id="copyBtn" class="btn btn-secondary" onclick="copyTip()" disabled>Copy</button>
+        </div>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+
+      <div id="tip" class="tip" aria-live="polite">
+        <div class="row">
+          <div class="grow">
+            <div id="tipCategory" class="pill"></div>
+            <h2 id="tipTitle" class="title">Personal Finance Tip</h2>
+            <div id="tipAdvice" class="advice"></div>
+            <div id="tipReason" class="reason"></div>
+            <div id="tipSavings" class="pill"></div>
+            <div id="tipConfidence" class="muted" style="margin-top:6px;color:#64748b;"></div>
+          </div>
+        </div>
+        <div class="steps">
+          <h3>Action Steps</h3>
+          <ol id="stepsList"></ol>
+        </div>
+        <div id="insights" class="insights"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
