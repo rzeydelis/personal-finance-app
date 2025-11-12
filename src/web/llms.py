@@ -8,14 +8,17 @@ import requests
 # Basic Ollama configuration via environment variables
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:latest')
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv('OLLAMA_TIMEOUT_SECONDS', '5000'))
 
 
-def _post_ollama_generate(payload: Dict[str, Any], timeout_seconds: int = 60) -> Tuple[bool, Dict[str, Any], Optional[str]]:
+def _post_ollama_generate(payload: Dict[str, Any], timeout_seconds: Optional[int] = None) -> Tuple[bool, Dict[str, Any], Optional[str]]:
+    """Send a request to Ollama's generate endpoint."""
+    timeout = timeout_seconds or OLLAMA_TIMEOUT_SECONDS
     try:
         response = requests.post(
             f"{OLLAMA_BASE_URL}/api/generate",
             json=payload,
-            timeout=timeout_seconds,
+            timeout=timeout,
         )
         response.raise_for_status()
         parsed = response.json()
@@ -24,11 +27,18 @@ def _post_ollama_generate(payload: Dict[str, Any], timeout_seconds: int = 60) ->
         return False, {}, str(exc)
 
 
-def generate_text(prompt: str, model: Optional[str] = None, stream: bool = False, system: Optional[str] = None, timeout_seconds: int = 60) -> Dict[str, Any]:
+def generate_text(
+    prompt: str,
+    model: Optional[str] = None,
+    stream: bool = False,
+    system: Optional[str] = None,
+    timeout_seconds: Optional[int] = None,
+) -> Dict[str, Any]:
     """Call Ollama to generate plain text.
 
     Returns a dict: { success: bool, text: str, error: Optional[str] }
     """
+    timeout = timeout_seconds or OLLAMA_TIMEOUT_SECONDS
     newlines = "\n\n"
     payload = {
         "model": model or OLLAMA_MODEL,
@@ -36,7 +46,7 @@ def generate_text(prompt: str, model: Optional[str] = None, stream: bool = False
         "stream": bool(stream),
     }
 
-    ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout_seconds)
+    ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout)
     if not ok:
         return {"success": False, "text": "", "error": err}
 
@@ -73,11 +83,17 @@ def _extract_json_maybe(text: str) -> Optional[Any]:
     return None
 
 
-def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str] = None, timeout_seconds: int = 300) -> Dict[str, Any]:
+def generate_json(
+    prompt: str,
+    model: Optional[str] = None,
+    system: Optional[str] = None,
+    timeout_seconds: Optional[int] = None,
+) -> Dict[str, Any]:
     """Call Ollama to generate valid JSON.
 
     Returns a dict: { success: bool, data: Any, raw_text: str, error: Optional[str] }
     """
+    timeout = timeout_seconds or OLLAMA_TIMEOUT_SECONDS
     newlines = "\n\n"
     payload = {
         "model": model or OLLAMA_MODEL,
@@ -88,7 +104,7 @@ def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str
         "keep_alive": "15m",
     }
 
-    ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout_seconds)
+    ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout)
     if not ok:
         return {"success": False, "data": None, "raw_text": "", "error": err}
 
@@ -98,5 +114,4 @@ def generate_json(prompt: str, model: Optional[str] = None, system: Optional[str
         return {"success": False, "data": None, "raw_text": raw_text, "error": "Failed to parse JSON from model response"}
 
     return {"success": True, "data": parsed, "raw_text": raw_text, "error": None}
-
 
