@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plaid Link Helper</title>
+  <link rel="preconnect" href="https://cdn.plaid.com" />
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <style>
+    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#1f2937; --muted:#6b7280; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+    .brand { margin:0; font-size:1.2rem; font-weight:700; }
+    .wrap { max-width:920px; margin:26px auto; padding:0 16px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(15,23,42,.08); padding:24px; margin-bottom:22px; }
+    h1 { margin-top:0; }
+    h2 { margin-bottom:8px; font-size:1.1rem; }
+    .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+    .input { flex:1 1 240px; padding:10px 12px; border:1px solid #d1d9e6; border-radius:9px; font-size:0.95rem; }
+    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); border:none; color:#fff; padding:10px 18px; border-radius:10px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); transition:opacity .15s ease; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
+    .btn.secondary { background:#eff2f8; color:var(--brand-dark); border:1px solid #ced8ed; }
+    .status { margin-top:10px; font-size:0.9rem; color:var(--muted); }
+    .status.strong { color:#1e293b; font-weight:600; }
+    .outputs { margin-top:16px; display:grid; gap:14px; }
+    textarea { width:100%; min-height:80px; resize:vertical; padding:10px 12px; border:1px solid #d1d9e6; border-radius:10px; font-family:Menlo,Consolas,monospace; font-size:0.95rem; }
+    code { background:#eef2ff; padding:3px 6px; border-radius:6px; }
+    .muted { color:var(--muted); font-size:0.9rem; }
+    .stack { display:flex; flex-direction:column; gap:8px; }
+    label { font-weight:600; font-size:0.9rem; color:#1f2937; }
+    .divider { margin:18px 0; border:none; border-top:1px dashed #d6deec; }
+    .bad { color:#b91c1c; }
+    .good { color:#0f766e; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <p class="brand">Plaid Link Helper</p>
+  </div>
+  <div class="wrap">
+    <div class="card">
+      <h1>Run Plaid Link to Capture Tokens</h1>
+      <p>This helper lets you generate a Plaid <code>link_token</code>, open Plaid Link, and capture the resulting <code>public_token</code>. Once Plaid returns the token, you can immediately exchange it for an <code>access_token</code> via the backend.</p>
+    </div>
+
+    <div class="card">
+      <h2>Step 1 — Generate or Paste a Link Token</h2>
+      <div class="stack">
+        <div class="row">
+          <input id="linkUserId" class="input" type="text" placeholder="Link user id (defaults to web_user)" />
+          <button class="btn" onclick="requestLinkToken()">Request link token</button>
+        </div>
+        <input id="linkTokenInput" class="input" type="text" placeholder="Paste an existing link token (link-...)" />
+        <p class="muted">Link tokens expire after ~30 minutes. Request a fresh one if Plaid Link reports it is invalid.</p>
+        <div id="linkStatus" class="status"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Step 2 — Launch Plaid Link</h2>
+      <div class="stack">
+        <div class="row">
+          <button class="btn" onclick="launchPlaidLink()">Open Plaid Link</button>
+          <label><input id="autoExchange" type="checkbox" checked /> Automatically exchange public token</label>
+        </div>
+        <p class="muted">Use your Plaid sandbox credentials (for example <code>user_good</code> / <code>pass_good</code>) or real credentials in production. When Link finishes it returns a public token below.</p>
+        <div id="launchStatus" class="status"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Step 3 — Capture Tokens</h2>
+      <div class="outputs">
+        <div>
+          <label for="publicTokenOutput">Public token</label>
+          <textarea id="publicTokenOutput" readonly placeholder="Public token appears after Plaid Link succeeds"></textarea>
+          <div class="row">
+            <button class="btn secondary" onclick="copyToClipboard('publicTokenOutput')">Copy public token</button>
+            <button class="btn secondary" onclick="manualExchange()">Exchange public token</button>
+          </div>
+        </div>
+        <div>
+          <label for="accessTokenOutput">Access token (server response)</label>
+          <textarea id="accessTokenOutput" readonly placeholder="Access token will appear after exchange succeeds"></textarea>
+          <div class="row">
+            <button class="btn secondary" onclick="copyToClipboard('accessTokenOutput')">Copy access token</button>
+          </div>
+          <p class="muted">Access tokens are sensitive. They are also persisted to <code>data/plaid_access_tokens.json</code> for reuse.</p>
+        </div>
+        <div>
+          <label>Item metadata</label>
+          <p id="itemSummary" class="status strong">Awaiting Plaid Link...</p>
+        </div>
+        <div id="exchangeStatus" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let linkHandler = null;
+
+    async function requestLinkToken() {
+      const status = document.getElementById('linkStatus');
+      const userInput = document.getElementById('linkUserId');
+      const userId = (userInput.value || '').trim() || 'web_user';
+      status.textContent = 'Requesting link token...';
+
+      try {
+        const resp = await fetch('/api/link-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.link_token) {
+          throw new Error(data.error || 'Failed to generate link token.');
+        }
+        document.getElementById('linkTokenInput').value = data.link_token;
+        status.textContent = `Generated link token for ${data.user_id}. Click “Open Plaid Link” to continue.`;
+      } catch (err) {
+        status.textContent = `❌ ${err.message}`;
+      }
+    }
+
+    function launchPlaidLink() {
+      const launchStatus = document.getElementById('launchStatus');
+      const linkToken = (document.getElementById('linkTokenInput').value || '').trim();
+
+      if (!linkToken) {
+        launchStatus.textContent = 'Provide a link token first.';
+        return;
+      }
+      if (!window.Plaid || typeof window.Plaid.create !== 'function') {
+        launchStatus.textContent = 'Plaid loader failed to initialize. Check your network connection.';
+        return;
+      }
+
+      launchStatus.textContent = 'Opening Plaid Link...';
+      if (linkHandler && typeof linkHandler.destroy === 'function') {
+        linkHandler.destroy();
+      }
+
+      linkHandler = window.Plaid.create({
+        token: linkToken,
+        onSuccess: (publicToken, metadata) => handlePlaidSuccess(publicToken, metadata),
+        onExit: (err) => {
+          if (err) {
+            launchStatus.textContent = `Plaid Link exited with ${err.error_code || err.error_message || 'an error'}.`;
+          } else {
+            launchStatus.textContent = 'Plaid Link closed.';
+          }
+        }
+      });
+
+      try {
+        linkHandler.open();
+      } catch (err) {
+        launchStatus.textContent = `Unable to open Plaid Link: ${err.message}`;
+      }
+    }
+
+    function handlePlaidSuccess(publicToken, metadata) {
+      const publicOutput = document.getElementById('publicTokenOutput');
+      const itemSummary = document.getElementById('itemSummary');
+      const launchStatus = document.getElementById('launchStatus');
+
+      publicOutput.value = publicToken;
+      const institution = metadata && metadata.institution ? metadata.institution.name : 'Unknown institution';
+      const itemId = metadata && metadata.item_id ? metadata.item_id : 'Not provided';
+      itemSummary.textContent = `Item ID: ${itemId} | Institution: ${institution}`;
+      launchStatus.textContent = 'Public token received from Plaid Link.';
+
+      if (document.getElementById('autoExchange').checked) {
+        exchangePublicToken(publicToken, metadata && metadata.item_id);
+      }
+    }
+
+    function manualExchange() {
+      const publicToken = (document.getElementById('publicTokenOutput').value || '').trim();
+      if (!publicToken) {
+        document.getElementById('exchangeStatus').textContent = 'No public token available to exchange.';
+        return;
+      }
+      exchangePublicToken(publicToken, null);
+    }
+
+    async function exchangePublicToken(publicToken, itemId) {
+      const exchangeStatus = document.getElementById('exchangeStatus');
+      exchangeStatus.textContent = 'Exchanging public token for access token...';
+
+      try {
+        const payload = { public_token: publicToken };
+        if (itemId) {
+          payload.item_id = itemId;
+        }
+
+        const resp = await fetch('/api/plaid-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+
+        if (!resp.ok || !data.success) {
+          throw new Error(data.error || 'Exchange failed.');
+        }
+
+        document.getElementById('accessTokenOutput').value = data.access_token || '';
+        document.getElementById('itemSummary').textContent = `Item ID: ${data.item_id || 'unknown'} | Token stored ${data.stored_at || 'now'}`;
+        exchangeStatus.textContent = '✅ Access token stored locally and returned below.';
+      } catch (err) {
+        exchangeStatus.textContent = `❌ ${err.message}`;
+      }
+    }
+
+    function copyToClipboard(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el) {
+        return;
+      }
+      el.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        navigator.clipboard.writeText(el.value || '').catch(() => {});
+      }
+    }
+  </script>
+</body>
+</html>

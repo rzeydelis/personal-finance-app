@@ -1,112 +1,107 @@
-# Plaid Access Token Generation Guide
+# Plaid Link & Token Guide
 
-This guide explains how to generate an access token for the Plaid API to retrieve bank transaction data.
+This document maps the exact steps required to turn the short-lived Plaid `link_token` into a reusable `access_token` inside this project. It supersedes the old instructions that referenced helper scripts which no longer exist.
 
-## Important Note
+---
 
-The documentation you referenced (`https://plaid.com/plaid-exchange/docs/authentication/`) is for **Plaid Exchange**, which is designed for financial institutions implementing OAuth to connect TO Plaid. 
+## Prerequisites
 
-Your current setup uses the **standard Plaid API**, which allows applications to connect to banks THROUGH Plaid. The authentication flow is different.
-
-## Standard Plaid API Authentication Flow
-
-```
-1. Create Link Token (Backend) → 2. Initialize Plaid Link (Frontend) → 3. Get Public Token → 4. Exchange for Access Token → 5. Use Access Token for API calls
-```
-
-## Step-by-Step Process
-
-### Step 1: Create a Link Token
-Run the backend script to generate a link token:
+- Populate `.env` with your Plaid dashboard credentials (client id, secret, and environment).
+- Install dependencies and run the Flask app:
 
 ```bash
-python link_token_create.py
+python -m venv .venv
+source .venv/bin/activate           # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python src/web/app.py
 ```
 
-This will output a link token that looks like: `link-sandbox-12345678-1234-1234-1234-123456789012`
+The web UI is served at <http://localhost:5000>.
 
-### Step 2: Use Plaid Link (Frontend)
-1. Open `plaid_link_demo.html` in your browser
-2. Paste the link token from Step 1
-3. Click "Connect Bank Account"
-4. Use these Sandbox test credentials:
-   - **Username:** `user_good`
-   - **Password:** `pass_good`
-   - **PIN:** `1234` (if asked)
+---
 
-### Step 3: Exchange Public Token for Access Token
-After successfully connecting through Plaid Link, you'll get a public token. Use it to get your access token:
+## Token Flow Overview
 
+```
+1. Backend issues link_token          (BankDataPipeline.create_link_token)
+2. Plaid Link runs in the browser     (helper page at /plaid-link)
+3. Plaid returns public_token + item  (Plaid Link success callback)
+4. Backend exchanges public_token     (/api/plaid-token → store_access_token)
+5. access_token persisted for reuse   (data/plaid_access_tokens.json + ENV)
+```
+
+You can perform steps 1–4 entirely through the web helper page, or mix the CLI and UI depending on your needs.
+
+---
+
+## Option A — Web Helper (fastest path)
+
+1. **Open the helper**  
+   Navigate to <http://localhost:5000/plaid-link> while the Flask server is running.
+
+2. **Request a link token**  
+   - Enter a stable user id (defaults to `web_user`).  
+   - Click **Request link token**.  
+   - The page calls `POST /api/link-token`, which instantiates `BankDataPipeline` and returns a fresh `link-...` token.
+
+3. **Launch Plaid Link**  
+   - Click **Open Plaid Link**.  
+   - The embedded Plaid Link widget launches using the link token. Use your Plaid sandbox credentials (`user_good` / `pass_good`) or production credentials depending on `PLAID_ENV`.
+
+4. **Capture the public token**  
+   - When Plaid Link completes, the helper surfaces the `public-...` token and item metadata.  
+   - With **Automatically exchange public token** checked (default), the page immediately sends that token to `POST /api/plaid-token`.
+
+5. **Access token stored & displayed**  
+   - The `/api/plaid-token` endpoint exchanges the public token, persists the resulting `access-...` token to `data/plaid_access_tokens.json`, sets `PLAID_ACCESS_TOKEN`/`PLAID_ITEM_ID` in-process, and echoes the access token back to the page so you can copy it if needed.
+
+You can now switch back to the main dashboard and click “Save token” (if you want to paste it there) or “Fetch fresh data” to pull transactions.
+
+---
+
+## Option B — Mixing CLI and UI
+
+Prefer scripting? Use the `BankDataPipeline` CLI to perform the backend pieces and the helper page only for Plaid Link.
+
+### 1. Generate a link token
 ```bash
-python exchange_token.py
+python src/api/bank_data_pipeline.py --link my_user_001
 ```
+Copy the printed `link-...` token.
 
-Enter the public token when prompted. This will output an access token.
+### 2. Run Plaid Link
+- Browse to <http://localhost:5000/plaid-link>
+- Paste the link token into the “Paste an existing link token” input
+- Click **Open Plaid Link** and authenticate with Plaid
 
-### Step 4: Use the Access Token
-Copy the access token and update it in `get_bank_trx.py`:
-
-```python
-ACCESS_TOKEN = 'access-sandbox-your-actual-token-here'
-```
-
-Then run your transaction script:
-
+### 3. Exchange the public token (CLI)
+After Link finishes, the helper shows the `public-...` token. You can either let the page exchange it automatically or run:
 ```bash
-python get_bank_trx.py
+python src/api/bank_data_pipeline.py --exchange public-sandbox-abc123...
 ```
+The CLI prints the stored metadata and writes the access token to `data/plaid_access_tokens.json`.
 
-## Files Overview
+---
 
-- **`link_token_create.py`** - Creates link tokens for Plaid Link initialization
-- **`plaid_link_demo.html`** - Frontend demo for Plaid Link integration
-- **`exchange_token.py`** - Exchanges public tokens for access tokens
-- **`get_bank_trx.py`** - Your existing script to fetch transactions (now with proper access token)
+## Where Tokens Are Saved
 
-## Security Best Practices
+- File store: `data/plaid_access_tokens.json` (gitignored)
+- Environment (for current process): `PLAID_ACCESS_TOKEN`, `PLAID_ITEM_ID`
+- UI: both the Plaid Link helper and the main dashboard `/api/plaid-token` response include the access token for convenience
 
-1. **Never expose credentials in frontend code** - Link tokens are safe for frontend use, but keep client secrets on the backend
-2. **Store access tokens securely** - In production, store access tokens in a secure database, not in source code
-3. **Use environment variables** - For production, load credentials from environment variables:
+Treat these values as sensitive secrets—especially in production. Do not commit them to source control.
 
-```python
-import os
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-```
+---
 
-## Production vs Sandbox
+## Troubleshooting & Tips
 
-- **Sandbox**: Use `plaid.Environment.Sandbox` for testing
-- **Production**: Use `plaid.Environment.Production` for live data
-- **Development**: Use `plaid.Environment.Development` for development testing
+- **“Plaid pipeline utilities are unavailable”** — ensure `requirements.txt` is installed and the server can import `src.api.bank_data_pipeline`.  
+- **`PLAID_CONFIGURATION_ERROR`** — check `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` inside `.env`.  
+- **“link token expired”** — generate a new token via `/api/link-token` or the CLI; they time out after ~30 minutes.  
+- **Sandbox credentials** — use `user_good` / `pass_good` (and `1234` PIN if prompted).  
+- **Multiple bank items** — after each successful exchange, the new token is appended to the store. You can manage them via `data/plaid_access_tokens.json` or the CLI (`--store-access`, `--download` options).  
+- **Production safety** — the helper returns the raw access token for convenience because the app is assumed to run locally. If you deploy the app, remove that value from the JSON response or protect the route.
 
-## Troubleshooting
+---
 
-### Common Issues:
-
-1. **"Invalid credentials"** - Check your client ID and secret
-2. **"Invalid link token"** - Link tokens expire after 30 minutes, generate a new one
-3. **"Item login required"** - The user needs to re-authenticate through Plaid Link
-4. **"Insufficient permissions"** - Ensure your Plaid account has access to the products you're requesting
-
-### Error Codes:
-- `INVALID_CREDENTIALS` - Wrong client ID or secret
-- `INVALID_ACCESS_TOKEN` - Access token is invalid or expired
-- `ITEM_LOGIN_REQUIRED` - User needs to re-link their account
-- `RATE_LIMIT_EXCEEDED` - Too many API requests
-
-## Next Steps
-
-Once you have a working access token:
-
-1. **Store multiple tokens** - Users can connect multiple bank accounts
-2. **Handle token rotation** - Access tokens can expire and need refresh
-3. **Implement webhooks** - Get notifications when account data changes
-4. **Add error handling** - Handle various Plaid API errors gracefully
-
-## Resources
-
-- [Plaid API Reference](https://plaid.com/docs/api/)
-- [Plaid Link Guide](https://plaid.com/docs/link/)
-- [Python Quickstart](https://plaid.com/docs/quickstart/) 
+With the helper page and the refreshed CLI, you can now go from a Plaid link token to a stored access token in one session, making it easy to test the rest of the personal finance pipeline.*** End Patch

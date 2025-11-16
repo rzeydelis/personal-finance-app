@@ -23,6 +23,7 @@
     .btn:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; }
     .btn-secondary { background:#eef2f7; color:#0b5ed7; border:1px solid #d8e1ee; }
     .status { margin-top:10px; display:none; color:var(--muted); }
+    .status.small { font-size:0.85rem; }
     .spinner { width:32px; height:32px; border:3px solid #e9eef6; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; display:inline-block; vertical-align:middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .tip { margin-top:16px; display:none; }
@@ -36,6 +37,12 @@
     .insights { margin-top:12px; background:#f7f9fc; border:1px solid #e6eaef; border-radius:10px; padding:12px; color:#334155; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .grow { flex:1 1 auto; }
+    .token-block { margin-top:24px; background:#f8fbff; border:1px solid #dbe5f6; border-radius:14px; padding:18px; color:#334155; }
+    .token-block h2 { margin:0 0 6px 0; font-size:1.1rem; }
+    .token-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; }
+    .token-inputs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+    .token-input { flex:1 1 240px; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; }
+    .token-actions { display:flex; gap:10px; flex-wrap:wrap; }
   </style>
   <script>
     async function generateTip(fetchFresh) {
@@ -99,6 +106,60 @@
       });
     }
 
+    async function saveToken() {
+      const accessInput = document.getElementById('accessTokenInput');
+      const publicInput = document.getElementById('publicTokenInput');
+      const itemInput = document.getElementById('itemIdInput');
+      const status = document.getElementById('tokenStatus');
+
+      const accessToken = (accessInput.value || '').trim();
+      const publicToken = (publicInput.value || '').trim();
+      const itemId = (itemInput.value || '').trim();
+
+      status.style.display = 'block';
+      status.textContent = '🔄 Saving Plaid token...';
+
+      try {
+        if (!accessToken && !publicToken) {
+          throw new Error('Enter an access token or a public token.');
+        }
+
+        const payload = {};
+        if (accessToken) payload.access_token = accessToken;
+        if (publicToken) payload.public_token = publicToken;
+        if (itemId) payload.item_id = itemId;
+
+        const resp = await fetch('/api/plaid-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+
+        if (!resp.ok || !data.success) {
+          throw new Error(data.error || 'Failed to save Plaid token.');
+        }
+
+        status.textContent = `✅ Token saved${data.item_id ? ` for item ${data.item_id}` : ''}.`;
+        accessInput.value = '';
+        publicInput.value = '';
+        if (data.item_id) {
+          itemInput.value = data.item_id;
+        }
+      } catch (e) {
+        status.textContent = `❌ ${e.message}`;
+      }
+    }
+
+    function clearTokenForm() {
+      document.getElementById('accessTokenInput').value = '';
+      document.getElementById('publicTokenInput').value = '';
+      document.getElementById('itemIdInput').value = '';
+      const status = document.getElementById('tokenStatus');
+      status.style.display = 'none';
+      status.textContent = '';
+    }
+
   </script>
   </head>
 <body>
@@ -138,9 +199,23 @@
         </div>
         <div id="insights" class="insights"></div>
       </div>
+
+      <div class="token-block" aria-live="polite">
+        <h2>Connect Plaid Access</h2>
+        <p>Paste a Plaid access token (format <code>access-*-*</code>) or a public token you just received from Plaid Link. We'll store it securely on this machine so one click can fetch the last N days.</p>
+        <div class="token-inputs">
+          <input id="accessTokenInput" class="token-input" type="text" placeholder="Plaid access token (access-...)" autocomplete="off" />
+          <input id="publicTokenInput" class="token-input" type="text" placeholder="Plaid public token (public-...)" autocomplete="off" />
+          <input id="itemIdInput" class="token-input" type="text" placeholder="Optional item_id" autocomplete="off" />
+        </div>
+        <div class="token-actions">
+          <button class="btn" onclick="saveToken()">Save token</button>
+          <button class="btn btn-secondary" onclick="clearTokenForm()">Clear</button>
+        </div>
+        <div id="tokenStatus" class="status small"></div>
+      </div>
     </div>
 
   </div>
 </body>
 </html>
-

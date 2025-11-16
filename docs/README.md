@@ -67,31 +67,51 @@ PLAID_ENV=sandbox  # Use 'sandbox' for testing, 'production' for live data
 3. Copy your `client_id` and `secret` keys
 4. Set appropriate allowed products and countries
 
-### 4. Get Access Token
+### 4. Link Your Bank Account
 
-Before fetching transactions, you need an access token by linking a bank account:
+Before fetching live transactions you must complete the Plaid Link flow to obtain an access token:
 
-```bash
-# Start the Flask app
-python src/web/app.py
+1. Create a Link token (launches the Plaid Link modal in your frontend):
+   ```bash
+   python src/api/bank_data_pipeline.py --link your_user_id
+   ```
+2. Complete the Plaid Link workflow in the browser and capture the resulting `public_token`.
+3. Exchange the public token for an access token:
+   ```bash
+   python src/api/bank_data_pipeline.py public-sandbox-abc123...
+   ```
+   The helper will print the `access_token` and also persist it to `data/plaid_access_tokens.json` for reuse.
+4. Copy the printed access token into your `.env` file as `PLAID_ACCESS_TOKEN`, or leave it in the token store if you prefer not to keep secrets in environment variables.
 
-# Or run the link token creation script
-python src/api/link_token_create.py
-```
+💡 Access tokens always follow the format `access-<environment>-<identifier>`. If you see a Plaid error about an invalid token format, re-run the exchange step above.
 
 ## Usage
 
 ### Fetch Bank Transactions
 
 ```bash
+# Fetch the last 90 days (default)
 python src/api/get_bank_trx.py
+
+# Specify a custom range
+python src/api/get_bank_trx.py 2024-08-01 2024-09-01
+
+# Or use a rolling window
+python src/api/get_bank_trx.py --days 30
 ```
 
-This will:
-- Connect to your linked bank account
-- Fetch transactions from the last 360 days
-- Save results to a text file in the `data/` directory
-- Display transaction summary in the console
+The exporter now:
+- Reuses access tokens stored in `.env` or `data/plaid_access_tokens.json`
+- Filters to specific accounts when you set `PLAID_ACCOUNT_NAME_FILTER`, `PLAID_ACCOUNT_IDS`, or `PLAID_ACCOUNT_SUBTYPES`
+- Saves results to `data/transactions_<start>_to_<end>.txt`
+- Surfaces actionable error messages if credentials are missing or invalid
+
+Example for Chase-only exports:
+
+```bash
+# .env
+PLAID_ACCOUNT_NAME_FILTER=chase
+```
 
 ### Run Web Application
 
@@ -100,6 +120,8 @@ python src/web/app.py
 ```
 
 Visit `http://localhost:5000` to access the web interface.
+
+The dashboard now includes a **Connect Plaid Access** panel—paste either a freshly exchanged Plaid access token or the public token you just received from Plaid Link. The app will store it locally (in `data/plaid_access_tokens.json`) so one click can refresh your Chase transactions.
 
 ### Mortgage Rate Analysis
 
@@ -115,6 +137,7 @@ python src/api/get_mortgage_rate.py
 - **Use Sandbox Environment**: Start with `PLAID_ENV=sandbox` for testing
 - **Rotate Keys Regularly**: Regenerate API keys periodically
 - **Limit Access**: Use environment-specific keys with minimal required permissions
+- **Token store**: Exchanged access tokens are cached in `data/plaid_access_tokens.json` (gitignored). Treat this file as sensitive.
 
 ## API Documentation
 
