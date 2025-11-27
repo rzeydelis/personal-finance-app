@@ -44,6 +44,7 @@ def generate_text(
         "model": model or OLLAMA_MODEL,
         "prompt": f"{system + newlines if system else ''}{prompt}",
         "stream": bool(stream),
+        "thinking": "true",
     }
 
     ok, raw, err = _post_ollama_generate(payload, timeout_seconds=timeout)
