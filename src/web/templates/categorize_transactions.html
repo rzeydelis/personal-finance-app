@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Categorize Transactions</title>
+  <style>
+    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
+    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
+    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:14px 20px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+    .topbar .inner { max-width: 1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; letter-spacing:.2px; }
+    .nav a { color:#e9f2ff; text-decoration:none; margin-left:16px; font-weight:600; }
+    .nav a:hover { text-decoration:underline; }
+    .wrap { max-width: 1200px; margin: 26px auto; padding: 0 16px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,.08); padding:22px; margin-bottom:20px; }
+    .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+    .header h1 { margin:0; font-size:1.4rem; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; }
+    .toggle { display:flex; align-items:center; gap:8px; background:#f5f7fb; border:1px solid #e6eaef; padding:8px 10px; border-radius:10px; }
+    .num { width:90px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:10px; }
+    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); transition:transform 0.1s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; transform: none; }
+    .btn-secondary { background:#eef2f7; color:#0b5ed7; border:1px solid #d8e1ee; box-shadow:none; }
+    .status { margin-top:10px; display:none; color:var(--muted); }
+    .status.small { font-size:0.85rem; }
+    .spinner { width:32px; height:32px; border:3px solid #e9eef6; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; display:inline-block; vertical-align:middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px; }
+    .summary-card { background:#f8fbff; border:1px solid #dbe5f6; border-radius:10px; padding:14px; }
+    .summary-card .label { font-size:0.85rem; color:var(--muted); margin-bottom:4px; }
+    .summary-card .value { font-size:1.6rem; font-weight:800; color:var(--brand); }
+    .summary-card .detail { font-size:0.9rem; color:#5b6c82; margin-top:4px; }
+    
+    .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; align-items:center; }
+    .filter-bar select, .filter-bar input { padding:8px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; }
+    .filter-bar label { font-weight:600; color:#334155; }
+    
+    .transactions-table { width:100%; border-collapse:collapse; margin-top:10px; }
+    .transactions-table th { background:#f7f9fc; padding:12px; text-align:left; font-weight:700; border-bottom:2px solid #e6eaef; position:sticky; top:0; }
+    .transactions-table td { padding:10px 12px; border-bottom:1px solid #f0f3f7; }
+    .transactions-table tr:hover { background:#f9fbfd; }
+    .category-badge { display:inline-block; padding:4px 10px; border-radius:6px; font-size:0.85rem; font-weight:600; }
+    .confidence-high { background:#d1fae5; color:#065f46; }
+    .confidence-medium { background:#fed7aa; color:#92400e; }
+    .confidence-low { background:#fecaca; color:#991b1b; }
+    
+    .amount-positive { color:#059669; font-weight:700; }
+    .amount-negative { color:#dc2626; font-weight:700; }
+    
+    .empty-state { text-align:center; padding:40px; color:var(--muted); }
+    .empty-state-icon { font-size:3rem; margin-bottom:10px; }
+    
+    .export-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .upload-block { margin-bottom:20px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:14px; padding:18px; }
+    .upload-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#0369a1; }
+    .upload-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
+    .file-input-wrapper { position:relative; display:inline-block; }
+    .file-input { position:absolute; opacity:0; width:0; height:0; }
+    .file-label { display:inline-block; padding:10px 16px; background:#0ea5e9; color:#fff; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(14,165,233,.25); transition:all 0.2s; }
+    .file-label:hover { background:#0284c7; transform:translateY(-1px); }
+    .file-name { margin-left:12px; color:#334155; font-size:0.95rem; }
+    .upload-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .sample-format { margin-top:12px; padding:10px; background:#fefce8; border:1px solid #fde047; border-radius:8px; font-size:0.85rem; color:#854d0e; }
+    .sample-format code { background:#fef3c7; padding:2px 4px; border-radius:4px; }
+    .llm-block { margin-bottom:20px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:18px; }
+    .llm-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#166534; }
+    .llm-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
+    .llm-toggle { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+    .llm-toggle input[type="checkbox"] { width:20px; height:20px; cursor:pointer; }
+    .llm-toggle label { font-weight:600; color:#334155; cursor:pointer; }
+    .llm-input { width:100%; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; margin-bottom:10px; }
+    .llm-info { font-size:0.85rem; color:#64748b; margin-top:8px; }
+  </style>
+  <script>
+    let allTransactions = [];
+    let filteredTransactions = [];
+    let uploadedCSV = null;
+    let useOpenAI = false;
+
+    function toggleOpenAI(checked) {
+      useOpenAI = checked;
+      const apiKeyInput = document.getElementById('openaiApiKey');
+      apiKeyInput.disabled = !checked;
+      if (!checked) {
+        apiKeyInput.value = '';
+      }
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      const fileNameDisplay = document.getElementById('fileName');
+      const uploadStatus = document.getElementById('uploadStatus');
+      const categorizeBtn = document.getElementById('categorizeBtn');
+      
+      if (!file) {
+        uploadedCSV = null;
+        fileNameDisplay.textContent = '';
+        uploadStatus.style.display = 'none';
+        return;
+      }
+      
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        uploadStatus.style.display = 'block';
+        uploadStatus.textContent = '❌ Please upload a CSV file';
+        uploadedCSV = null;
+        fileNameDisplay.textContent = '';
+        return;
+      }
+      
+      fileNameDisplay.textContent = `📄 ${file.name}`;
+      uploadStatus.style.display = 'block';
+      uploadStatus.textContent = '🔄 Reading CSV file...';
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        uploadedCSV = e.target.result;
+        uploadStatus.textContent = '✅ CSV loaded successfully';
+        uploadStatus.style.color = '#059669';
+        categorizeBtn.textContent = 'Categorize CSV';
+      };
+      reader.onerror = function() {
+        uploadStatus.textContent = '❌ Failed to read file';
+        uploadedCSV = null;
+        fileNameDisplay.textContent = '';
+      };
+      reader.readAsText(file);
+    }
+
+    function clearUpload() {
+      uploadedCSV = null;
+      document.getElementById('csvFileInput').value = '';
+      document.getElementById('fileName').textContent = '';
+      document.getElementById('uploadStatus').style.display = 'none';
+      document.getElementById('categorizeBtn').textContent = 'Categorize';
+    }
+
+    async function categorizeTransactions(fetchFresh) {
+      const status = document.getElementById('status');
+      const resultsSection = document.getElementById('results');
+      const btn = document.getElementById('categorizeBtn');
+      const lookback = document.getElementById('lookback').value || 90;
+      const openaiApiKey = document.getElementById('openaiApiKey').value.trim();
+
+      resultsSection.style.display = 'none';
+      status.style.display = 'block';
+      status.innerHTML = '<span class="spinner"></span>Categorizing your transactions...';
+      btn.disabled = true;
+
+      try {
+        const payload = {
+          fetch_fresh: !!fetchFresh,
+          lookback_days: parseInt(lookback, 10),
+          use_openai: useOpenAI,
+          openai_api_key: openaiApiKey
+        };
+        
+        // If CSV is uploaded, use that instead
+        if (uploadedCSV) {
+          payload.use_csv = true;
+          payload.csv_data = uploadedCSV;
+          payload.fetch_fresh = false;
+        }
+
+        const resp = await fetch('/api/categorize-transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        
+        if (!data.success) throw new Error(data.error || 'Failed to categorize transactions');
+        
+        allTransactions = data.transactions || [];
+        filteredTransactions = [...allTransactions];
+        
+        renderSummary(data.category_summary || {});
+        renderTransactions();
+        
+        resultsSection.style.display = 'block';
+        status.style.display = 'none';
+        btn.disabled = false;
+      } catch (e) {
+        status.innerHTML = `❌ ${e.message}`;
+        btn.disabled = false;
+      }
+    }
+
+    function renderSummary(categorySummary) {
+      const summaryGrid = document.getElementById('summaryGrid');
+      const totalTransactions = Object.values(categorySummary).reduce((sum, cat) => sum + cat.count, 0);
+      const totalSpending = Object.values(categorySummary).reduce((sum, cat) => sum + cat.total, 0);
+      
+      const sortedCategories = Object.entries(categorySummary)
+        .sort((a, b) => b[1].total - a[1].total)
+        .slice(0, 5);
+      
+      let html = `
+        <div class="summary-card">
+          <div class="label">Total Transactions</div>
+          <div class="value">${totalTransactions}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Total Spending</div>
+          <div class="value">$${totalSpending.toFixed(2)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Categories</div>
+          <div class="value">${Object.keys(categorySummary).length}</div>
+        </div>
+      `;
+      
+      sortedCategories.forEach(([category, stats]) => {
+        html += `
+          <div class="summary-card">
+            <div class="label">${category}</div>
+            <div class="value">$${stats.total.toFixed(2)}</div>
+            <div class="detail">${stats.count} transactions</div>
+          </div>
+        `;
+      });
+      
+      summaryGrid.innerHTML = html;
+      
+      // Populate category filter
+      const categoryFilter = document.getElementById('categoryFilter');
+      categoryFilter.innerHTML = '<option value="">All Categories</option>';
+      Object.keys(categorySummary).sort().forEach(cat => {
+        categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+      });
+    }
+
+    function renderTransactions() {
+      const tbody = document.getElementById('transactionsBody');
+      
+      if (filteredTransactions.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <div>No transactions found</div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      const html = filteredTransactions.map(trx => {
+        const amount = trx.amount || 0;
+        const amountClass = amount < 0 ? 'amount-positive' : 'amount-negative';
+        const confidenceClass = `confidence-${trx.confidence || 'low'}`;
+        const category = trx.category || 'Other';
+        const subcategory = trx.subcategory || '';
+        
+        return `
+          <tr>
+            <td>${trx.date || 'N/A'}</td>
+            <td>${trx.name || trx.merchant || 'Unknown'}</td>
+            <td class="${amountClass}">$${Math.abs(amount).toFixed(2)}</td>
+            <td>${trx.account_name || trx.account || 'Unknown'}</td>
+            <td>
+              <span class="category-badge" style="background:#e0f2fe; color:#075985;">${category}</span>
+              ${subcategory ? `<br><small style="color:#64748b;">${subcategory}</small>` : ''}
+            </td>
+            <td><span class="category-badge ${confidenceClass}">${trx.confidence || 'low'}</span></td>
+          </tr>
+        `;
+      }).join('');
+      
+      tbody.innerHTML = html;
+      
+      document.getElementById('resultCount').textContent = 
+        `Showing ${filteredTransactions.length} of ${allTransactions.length} transactions`;
+    }
+
+    function filterTransactions() {
+      const categoryFilter = document.getElementById('categoryFilter').value;
+      const searchText = document.getElementById('searchFilter').value.toLowerCase();
+      
+      filteredTransactions = allTransactions.filter(trx => {
+        const matchesCategory = !categoryFilter || trx.category === categoryFilter;
+        const matchesSearch = !searchText || 
+          (trx.name || '').toLowerCase().includes(searchText) ||
+          (trx.merchant || '').toLowerCase().includes(searchText) ||
+          (trx.category || '').toLowerCase().includes(searchText);
+        return matchesCategory && matchesSearch;
+      });
+      
+      renderTransactions();
+    }
+
+    function exportToCSV() {
+      if (filteredTransactions.length === 0) {
+        alert('No transactions to export');
+        return;
+      }
+      
+      const headers = ['Date', 'Name', 'Amount', 'Account', 'Category', 'Subcategory', 'Confidence'];
+      const rows = filteredTransactions.map(trx => [
+        trx.date || '',
+        trx.name || trx.merchant || '',
+        (trx.amount || 0).toFixed(2),
+        trx.account_name || trx.account || '',
+        trx.category || '',
+        trx.subcategory || '',
+        trx.confidence || ''
+      ]);
+      
+      const csv = [headers, ...rows].map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+      ).join('\n');
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `categorized_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportToJSON() {
+      if (filteredTransactions.length === 0) {
+        alert('No transactions to export');
+        return;
+      }
+      
+      const json = JSON.stringify(filteredTransactions, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `categorized_transactions_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+  </script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="inner">
+      <div class="brand">🏷️ Transaction Categorizer</div>
+      <div class="nav">
+        <a href="/">Finance Tip</a>
+        <a href="/categorize">Categorize</a>
+        <a href="/plaid-link">Plaid Link</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card llm-block">
+      <h2>🤖 LLM Provider (Optional)</h2>
+      <p>By default, this uses your local Ollama instance. Enable this option to use OpenAI's cloud models instead (requires API key).</p>
+      <div class="llm-toggle">
+        <input type="checkbox" id="useOpenAICheck" onchange="toggleOpenAI(this.checked)" />
+        <label for="useOpenAICheck">Use OpenAI Cloud Model</label>
+      </div>
+      <input id="openaiApiKey" class="llm-input" type="password" placeholder="OpenAI API Key (sk-...)" autocomplete="off" disabled />
+      <div class="llm-info">
+        ℹ️ Your API key is only used for this session and never stored on the server. Default model: gpt-4o-mini
+      </div>
+    </div>
+
+    <div class="card upload-block">
+      <h2>📊 Upload CSV Transactions (Optional)</h2>
+      <p>Upload a CSV file with your transaction data. Your CSV should have columns for date, name/merchant, and amount.</p>
+      <div class="upload-actions">
+        <div class="file-input-wrapper">
+          <input type="file" id="csvFileInput" class="file-input" accept=".csv" onchange="handleFileUpload(event)" />
+          <label for="csvFileInput" class="file-label">Choose CSV File</label>
+        </div>
+        <span id="fileName" class="file-name"></span>
+        <button class="btn btn-secondary" onclick="clearUpload()" style="margin-left:auto;">Clear CSV</button>
+      </div>
+      <div id="uploadStatus" class="status small"></div>
+      <div class="sample-format">
+        <strong>Expected format:</strong> <code>date,name,amount</code> or <code>date,merchant,amount,account</code>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="header">
+        <h1>Categorize Your Transactions</h1>
+        <div class="controls">
+          <label class="toggle"><input id="fresh" type="checkbox" /> Fetch fresh data</label>
+          <input id="lookback" class="num" type="number" min="7" max="365" value="90" title="Lookback days" />
+          <button id="categorizeBtn" class="btn" onclick="categorizeTransactions(document.getElementById('fresh').checked)">Categorize</button>
+        </div>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </div>
+
+    <div id="results" style="display:none;">
+      <div class="card">
+        <h2 style="margin:0 0 16px 0;">Summary</h2>
+        <div id="summaryGrid" class="summary-grid"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+          <h2 style="margin:0;">Transactions</h2>
+          <div class="export-actions">
+            <button class="btn btn-secondary" onclick="exportToCSV()">Export CSV</button>
+            <button class="btn btn-secondary" onclick="exportToJSON()">Export JSON</button>
+          </div>
+        </div>
+        
+        <div class="filter-bar">
+          <label>Filter:</label>
+          <select id="categoryFilter" onchange="filterTransactions()">
+            <option value="">All Categories</option>
+          </select>
+          <input id="searchFilter" type="text" placeholder="Search transactions..." oninput="filterTransactions()" />
+        </div>
+        
+        <div id="resultCount" style="color:var(--muted); font-size:0.9rem; margin-bottom:10px;"></div>
+        
+        <div style="overflow-x:auto;">
+          <table class="transactions-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th>Amount</th>
+                <th>Account</th>
+                <th>Category</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsBody">
+              <tr>
+                <td colspan="6" class="empty-state">
+                  <div class="empty-state-icon">🔍</div>
+                  <div>Click "Categorize" to analyze your transactions</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+

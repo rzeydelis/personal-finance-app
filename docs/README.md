@@ -6,6 +6,9 @@ A comprehensive personal finance application that integrates with Plaid API to f
 
 - 🏦 **Bank Integration**: Connect to your bank accounts via Plaid API
 - 📊 **Transaction Analysis**: Fetch and analyze your transaction history
+- 📁 **CSV Upload**: Upload your own transaction data from any bank or financial tool
+- 🤖 **AI-Powered Insights**: Get personalized finance tips using LLM analysis
+- 🏷️ **Smart Categorization**: Automatically categorize transactions with AI
 - 🏠 **Mortgage Analysis**: Tools for mortgage rate analysis and tracking
 - 🔐 **Secure Configuration**: Environment-based configuration for API keys
 - 🌐 **Web Interface**: Flask-based web application with user-friendly interface
@@ -87,7 +90,23 @@ Before fetching live transactions you must complete the Plaid Link flow to obtai
 
 ## Usage
 
-### Fetch Bank Transactions
+### Option 1: CSV Upload (No Plaid Required)
+
+The easiest way to get started! Upload your transaction CSV file directly:
+
+1. Export transactions from your bank, credit card, or financial tool as CSV
+2. Visit `http://localhost:5000` (Finance Tip page) or `http://localhost:5000/categorize` (Categorization page)
+3. Click "Choose CSV File" in the upload section
+4. Select your CSV file
+5. Click "Generate Tip" or "Categorize"
+
+**CSV Format Requirements:**
+- Required columns: `date`, `name` (or merchant/description), `amount`
+- Optional columns: `account`, `time`
+- See `sample_transactions.csv` for an example
+- Full documentation: [CSV Upload Guide](./CSV_UPLOAD_GUIDE.md)
+
+### Option 2: Fetch Bank Transactions via Plaid
 
 ```bash
 # Fetch the last 90 days (default)
@@ -121,7 +140,26 @@ python src/web/app.py
 
 Visit `http://localhost:5000` to access the web interface.
 
-The dashboard now includes a **Connect Plaid Access** panel—paste either a freshly exchanged Plaid access token or the public token you just received from Plaid Link. The app will store it locally (in `data/plaid_access_tokens.json`) so one click can refresh your Chase transactions.
+#### Available Pages
+
+- **`/` or `/tip`**: Finance Tip Generator - Get personalized financial advice
+- **`/categorize`**: Transaction Categorization - Automatically categorize and analyze transactions
+- **`/plaid-link`**: Plaid Link Integration - Connect your bank account
+
+#### Using the Web Interface
+
+**With CSV Upload (Recommended for first-time users):**
+1. Prepare a CSV file with your transactions (see `sample_transactions.csv`)
+2. Upload via the "Upload CSV" section on any page
+3. Click the main action button to analyze
+
+**With Plaid Integration:**
+1. Use the **Connect Plaid Access** panel to paste an access token or public token
+2. Check "Fetch fresh data" to pull latest transactions
+3. Adjust lookback period (days) as needed
+4. Click "Generate Tip" or "Categorize"
+
+The app stores Plaid tokens locally in `data/plaid_access_tokens.json` for reuse.
 
 ### Mortgage Rate Analysis
 

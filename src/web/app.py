@@ -1,23 +1,29 @@
+import csv
 import logging
 import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from io import StringIO
 
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # LLM client
 try:
     from .llms import generate_json as llm_generate_json
+    from .llms import categorize_transactions as llm_categorize_transactions
 except Exception:
     try:
         from llms import generate_json as llm_generate_json
+        from llms import categorize_transactions as llm_categorize_transactions
     except Exception:
         llm_generate_json = None
+        llm_categorize_transactions = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -164,7 +170,152 @@ def parse_transaction_file(file_path):
     except Exception as e:
         return {'success': False, 'transactions': [], 'count': 0, 'error': str(e)}
 
-def generate_finance_tip(transactions):
+
+def parse_csv_transactions(csv_content):
+    """Parse CSV content into structured transaction data
+    
+    Expected CSV formats (case-insensitive headers):
+    - date, name/merchant/description, amount [, account]
+    - date, time, name, description, amount [, account]
+    
+    Date formats supported: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, etc.
+    Amount formats: with or without $ sign, negative or positive
+    """
+    transactions = []
+    try:
+        # Use StringIO to read CSV content
+        csv_file = StringIO(csv_content)
+        reader = csv.DictReader(csv_file)
+        
+        if not reader.fieldnames:
+            return {'success': False, 'transactions': [], 'count': 0, 'error': 'CSV file is empty or has no headers'}
+        
+        # Normalize header names (lowercase, strip whitespace)
+        headers = {h.lower().strip(): h for h in reader.fieldnames if h}
+        
+        # Find required columns (case-insensitive)
+        date_col = None
+        name_col = None
+        amount_col = None
+        account_col = None
+        time_col = None
+        
+        for col in headers.keys():
+            if 'date' in col:
+                date_col = headers[col]
+            elif any(term in col for term in ['name', 'merchant', 'description', 'vendor']):
+                if not name_col:  # Use first match
+                    name_col = headers[col]
+            elif 'amount' in col or 'total' in col:
+                amount_col = headers[col]
+            elif 'account' in col:
+                account_col = headers[col]
+            elif 'time' in col:
+                time_col = headers[col]
+        
+        if not date_col or not amount_col:
+            return {
+                'success': False, 
+                'transactions': [], 
+                'count': 0, 
+                'error': 'CSV must have "date" and "amount" columns'
+            }
+        
+        if not name_col:
+            # Try to find any text column for name
+            for col in headers.keys():
+                if col not in ['date', 'amount', 'account', 'time']:
+                    name_col = headers[col]
+                    break
+        
+        if not name_col:
+            return {
+                'success': False, 
+                'transactions': [], 
+                'count': 0, 
+                'error': 'CSV must have a column for transaction name/merchant/description'
+            }
+        
+        # Parse each row
+        for i, row in enumerate(reader, 1):
+            try:
+                date_str = row.get(date_col, '').strip()
+                name = row.get(name_col, '').strip() or 'Unknown'
+                amount_str = row.get(amount_col, '').strip()
+                account_name = row.get(account_col, '').strip() if account_col else None
+                time_str = row.get(time_col, '').strip() if time_col else '12:00:00'
+                
+                if not date_str or not amount_str:
+                    continue
+                
+                # Parse date - try multiple formats
+                date_obj = None
+                date_formats = [
+                    '%Y-%m-%d',
+                    '%m/%d/%Y',
+                    '%d/%m/%Y',
+                    '%Y/%m/%d',
+                    '%m-%d-%Y',
+                    '%d-%m-%Y',
+                    '%b %d, %Y',
+                    '%B %d, %Y',
+                    '%d %b %Y',
+                    '%d %B %Y',
+                ]
+                
+                for fmt in date_formats:
+                    try:
+                        date_obj = datetime.strptime(date_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                
+                if not date_obj:
+                    logging.warning(f"Could not parse date '{date_str}' in row {i}")
+                    continue
+                
+                # Parse amount - remove $ and commas, handle negative
+                amount_str = amount_str.replace('$', '').replace(',', '').strip()
+                
+                # Handle parentheses for negative amounts (accounting format)
+                if amount_str.startswith('(') and amount_str.endswith(')'):
+                    amount_str = '-' + amount_str[1:-1]
+                
+                try:
+                    amount = float(amount_str)
+                except ValueError:
+                    logging.warning(f"Could not parse amount '{amount_str}' in row {i}")
+                    continue
+                
+                transactions.append({
+                    'id': len(transactions) + 1,
+                    'date': date_obj.strftime('%Y-%m-%d'),
+                    'datetime': date_obj,
+                    'name': name,
+                    'merchant': name,
+                    'description': name,
+                    'amount': amount,
+                    'account_name': account_name,
+                    'time': time_str
+                })
+            except Exception as e:
+                logging.warning(f"Error parsing row {i}: {e}")
+                continue
+        
+        if not transactions:
+            return {
+                'success': False,
+                'transactions': [],
+                'count': 0,
+                'error': 'No valid transactions found in CSV. Check date and amount formats.'
+            }
+        
+        return {'success': True, 'transactions': transactions, 'count': len(transactions), 'error': None}
+    except Exception as e:
+        logging.exception("Error parsing CSV")
+        return {'success': False, 'transactions': [], 'count': 0, 'error': f'CSV parsing error: {str(e)}'}
+
+def generate_finance_tip(transactions, openai_api_key=None, use_openai=False):
     """Generate personalized finance tip using LLM"""
     if not llm_generate_json:
         return {'success': False, 'analysis': {}, 'error': 'LLM not available'}
@@ -231,7 +382,7 @@ Expanded Analysis Rules (including month-over-month support)
     7. Stay strictly grounded in the provided data—do not invent charges, categories, or memberships."""
     try:
         # print(f"Prompt: {prompt}")
-        result = llm_generate_json(prompt)
+        result = llm_generate_json(prompt, openai_api_key=openai_api_key, use_openai=use_openai)
         if result.get('success'):
             return {'success': True, 'analysis': result.get('data', {}), 'error': None}
         return {'success': False, 'analysis': {}, 'error': result.get('error', 'Unknown error')}
@@ -327,6 +478,12 @@ def tip_page():
     return render_template('finance_tip.html')
 
 
+@app.route('/categorize')
+def categorize_page():
+    """Transaction categorization page"""
+    return render_template('categorize_transactions.html')
+
+
 @app.route('/plaid-link')
 def plaid_link_page():
     """Helper page to run Plaid Link and capture tokens."""
@@ -339,8 +496,19 @@ def get_finance_tip():
         data = request.get_json() or {}
         fetch_fresh = data.get('fetch_fresh', False)
         lookback_days = int(data.get('lookback_days', 90))
+        use_csv = data.get('use_csv', False)
+        csv_data = data.get('csv_data', '')
+        openai_api_key = data.get('openai_api_key', '')
+        use_openai = data.get('use_openai', False)
         
-        if fetch_fresh:
+        if use_csv and csv_data:
+            # Parse CSV data directly
+            logging.info("Using uploaded CSV data...")
+            parse_result = parse_csv_transactions(csv_data)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse CSV: {parse_result["error"]}'}), 400
+            file_path = 'uploaded_csv'
+        elif fetch_fresh:
             # Fetch fresh data from Plaid API
             logging.info(f"Fetching fresh transactions from Plaid (last {lookback_days} days)...")
             fetch_result = fetch_fresh_transactions_from_plaid(days_back=lookback_days)
@@ -348,6 +516,9 @@ def get_finance_tip():
                 return jsonify({'error': f'Failed to fetch transactions: {fetch_result["error"]}'}), 500
             file_path = fetch_result['file_path']
             logging.info(f"Successfully fetched fresh transactions: {file_path}")
+            parse_result = parse_transaction_file(file_path)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
         else:
             # Use existing cached transaction file
             logging.info("Using cached transaction data...")
@@ -356,10 +527,9 @@ def get_finance_tip():
                 return jsonify({'error': f'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.'}), 404
             file_path = fetch_result['file_path']
             logging.info(f"Using cached file: {file_path}")
-        
-        parse_result = parse_transaction_file(file_path)
-        if not parse_result['success']:
-            return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
+            parse_result = parse_transaction_file(file_path)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
         
         transactions = parse_result['transactions']
         if not transactions:
@@ -371,7 +541,7 @@ def get_finance_tip():
         if not transactions:
             return jsonify({'error': 'No transactions within lookback window'}), 400
         
-        tip_result = generate_finance_tip(transactions)
+        tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai)
         
         return jsonify({
             'success': tip_result['success'],
@@ -384,6 +554,101 @@ def get_finance_tip():
         })
     except Exception as e:
         return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
+
+
+@app.route('/api/categorize-transactions', methods=['POST'])
+def categorize_transactions_api():
+    """Categorize transactions using LLM"""
+    if not llm_categorize_transactions:
+        return jsonify({'error': 'LLM categorization not available'}), 500
+    
+    try:
+        data = request.get_json() or {}
+        fetch_fresh = data.get('fetch_fresh', False)
+        lookback_days = int(data.get('lookback_days', 90))
+        use_csv = data.get('use_csv', False)
+        csv_data = data.get('csv_data', '')
+        openai_api_key = data.get('openai_api_key', '')
+        use_openai = data.get('use_openai', False)
+        
+        if use_csv and csv_data:
+            # Parse CSV data directly
+            logging.info("Using uploaded CSV data...")
+            parse_result = parse_csv_transactions(csv_data)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse CSV: {parse_result["error"]}'}), 400
+            file_path = 'uploaded_csv'
+        elif fetch_fresh:
+            logging.info(f"Fetching fresh transactions from Plaid (last {lookback_days} days)...")
+            fetch_result = fetch_fresh_transactions_from_plaid(days_back=lookback_days)
+            if not fetch_result['success']:
+                return jsonify({'error': f'Failed to fetch transactions: {fetch_result["error"]}'}), 500
+            file_path = fetch_result['file_path']
+            logging.info(f"Successfully fetched fresh transactions: {file_path}")
+            parse_result = parse_transaction_file(file_path)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
+        else:
+            logging.info("Using cached transaction data...")
+            fetch_result = fetch_latest_transactions()
+            if not fetch_result['success']:
+                return jsonify({'error': 'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.'}), 404
+            file_path = fetch_result['file_path']
+            logging.info(f"Using cached file: {file_path}")
+            parse_result = parse_transaction_file(file_path)
+            if not parse_result['success']:
+                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
+        
+        transactions = parse_result['transactions']
+        if not transactions:
+            return jsonify({'error': 'No transactions found'}), 400
+        
+        cutoff = datetime.now() - timedelta(days=lookback_days)
+        transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
+        
+        if not transactions:
+            return jsonify({'error': 'No transactions within lookback window'}), 400
+        
+        # Sort by date descending (most recent first)
+        transactions.sort(key=lambda x: x.get('datetime', datetime.min), reverse=True)
+        
+        logging.info(f"Categorizing {len(transactions)} transactions...")
+        categorization_result = llm_categorize_transactions(
+            transactions,
+            openai_api_key=openai_api_key,
+            use_openai=use_openai
+        )
+        
+        if not categorization_result.get('success'):
+            return jsonify({
+                'error': f'Categorization failed: {categorization_result.get("error")}'
+            }), 500
+        
+        categorized_transactions = categorization_result.get('categorized_transactions', [])
+        
+        # Calculate category summaries
+        category_summary = {}
+        for trx in categorized_transactions:
+            category = trx.get('category', 'Other')
+            amount = trx.get('amount', 0)
+            if category not in category_summary:
+                category_summary[category] = {'count': 0, 'total': 0}
+            category_summary[category]['count'] += 1
+            category_summary[category]['total'] += amount
+        
+        return jsonify({
+            'success': True,
+            'file_path': file_path,
+            'transaction_count': len(categorized_transactions),
+            'lookback_days': lookback_days,
+            'transactions': categorized_transactions,
+            'category_summary': category_summary,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logging.exception("Transaction categorization failed")
+        return jsonify({'error': f'Transaction categorization failed: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
