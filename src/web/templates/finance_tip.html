@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Personal Finance Tip</title>
+  <link rel="preconnect" href="https://cdn.plaid.com" />
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
     :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
     body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
@@ -66,6 +68,8 @@
   <script>
     let uploadedCSV = null;
     let useOpenAI = false;
+    let plaidLinkHandler = null;
+    let plaidLinkToken = null;
 
     function toggleOpenAI(checked) {
       useOpenAI = checked;
@@ -73,6 +77,84 @@
       apiKeyInput.disabled = !checked;
       if (!checked) {
         apiKeyInput.value = '';
+      }
+    }
+
+    async function connectPlaidBank() {
+      const plaidStatus = document.getElementById('plaidStatus');
+      plaidStatus.style.display = 'block';
+      plaidStatus.textContent = '🔄 Initializing Plaid Link...';
+
+      try {
+        // Get a link token from the backend
+        const resp = await fetch('/api/link-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: 'web_user' })
+        });
+        const data = await resp.json();
+        
+        if (!resp.ok || !data.link_token) {
+          throw new Error(data.error || 'Failed to generate link token.');
+        }
+        
+        plaidLinkToken = data.link_token;
+        
+        // Launch Plaid Link
+        if (!window.Plaid || typeof window.Plaid.create !== 'function') {
+          throw new Error('Plaid loader failed to initialize. Check your network connection.');
+        }
+
+        if (plaidLinkHandler && typeof plaidLinkHandler.destroy === 'function') {
+          plaidLinkHandler.destroy();
+        }
+
+        plaidLinkHandler = window.Plaid.create({
+          token: plaidLinkToken,
+          onSuccess: async (publicToken, metadata) => {
+            plaidStatus.textContent = '🔄 Saving bank connection...';
+            
+            try {
+              const payload = { public_token: publicToken };
+              if (metadata && metadata.item_id) {
+                payload.item_id = metadata.item_id;
+              }
+
+              const exchangeResp = await fetch('/api/plaid-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const exchangeData = await exchangeResp.json();
+
+              if (!exchangeResp.ok || !exchangeData.success) {
+                throw new Error(exchangeData.error || 'Failed to save connection.');
+              }
+
+              const institution = metadata && metadata.institution ? metadata.institution.name : 'your bank';
+              plaidStatus.textContent = `✅ Successfully connected to ${institution}! You can now use "Fetch fresh data".`;
+              plaidStatus.style.color = '#059669';
+            } catch (err) {
+              plaidStatus.textContent = `❌ ${err.message}`;
+              plaidStatus.style.color = '#dc2626';
+            }
+          },
+          onExit: (err) => {
+            if (err) {
+              plaidStatus.textContent = `❌ Connection cancelled: ${err.error_message || 'Unknown error'}`;
+              plaidStatus.style.color = '#dc2626';
+            } else {
+              plaidStatus.textContent = 'Connection cancelled.';
+              plaidStatus.style.color = '#6c757d';
+            }
+          }
+        });
+
+        plaidLinkHandler.open();
+        plaidStatus.textContent = 'Opening Plaid Link...';
+      } catch (err) {
+        plaidStatus.textContent = `❌ ${err.message}`;
+        plaidStatus.style.color = '#dc2626';
       }
     }
 
@@ -200,60 +282,6 @@
       });
     }
 
-    async function saveToken() {
-      const accessInput = document.getElementById('accessTokenInput');
-      const publicInput = document.getElementById('publicTokenInput');
-      const itemInput = document.getElementById('itemIdInput');
-      const status = document.getElementById('tokenStatus');
-
-      const accessToken = (accessInput.value || '').trim();
-      const publicToken = (publicInput.value || '').trim();
-      const itemId = (itemInput.value || '').trim();
-
-      status.style.display = 'block';
-      status.textContent = '🔄 Saving Plaid token...';
-
-      try {
-        if (!accessToken && !publicToken) {
-          throw new Error('Enter an access token or a public token.');
-        }
-
-        const payload = {};
-        if (accessToken) payload.access_token = accessToken;
-        if (publicToken) payload.public_token = publicToken;
-        if (itemId) payload.item_id = itemId;
-
-        const resp = await fetch('/api/plaid-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await resp.json();
-
-        if (!resp.ok || !data.success) {
-          throw new Error(data.error || 'Failed to save Plaid token.');
-        }
-
-        status.textContent = `✅ Token saved${data.item_id ? ` for item ${data.item_id}` : ''}.`;
-        accessInput.value = '';
-        publicInput.value = '';
-        if (data.item_id) {
-          itemInput.value = data.item_id;
-        }
-      } catch (e) {
-        status.textContent = `❌ ${e.message}`;
-      }
-    }
-
-    function clearTokenForm() {
-      document.getElementById('accessTokenInput').value = '';
-      document.getElementById('publicTokenInput').value = '';
-      document.getElementById('itemIdInput').value = '';
-      const status = document.getElementById('tokenStatus');
-      status.style.display = 'none';
-      status.textContent = '';
-    }
-
   </script>
   </head>
 <body>
@@ -300,18 +328,12 @@
       </div>
 
       <div class="token-block" aria-live="polite">
-        <h2>Connect Plaid Access</h2>
-        <p>Paste a Plaid access token (format <code>access-*-*</code>) or a public token you just received from Plaid Link. We'll store it securely on this machine so one click can fetch the last N days.</p>
-        <div class="token-inputs">
-          <input id="accessTokenInput" class="token-input" type="text" placeholder="Plaid access token (access-...)" autocomplete="off" />
-          <input id="publicTokenInput" class="token-input" type="text" placeholder="Plaid public token (public-...)" autocomplete="off" />
-          <input id="itemIdInput" class="token-input" type="text" placeholder="Optional item_id" autocomplete="off" />
-        </div>
+        <h2>Connect Your Bank</h2>
+        <p>Click the button below to securely connect your bank account via Plaid. Once connected, you can fetch fresh transactions automatically.</p>
         <div class="token-actions">
-          <button class="btn" onclick="saveToken()">Save token</button>
-          <button class="btn btn-secondary" onclick="clearTokenForm()">Clear</button>
+          <button class="btn" onclick="connectPlaidBank()">🔗 Connect Bank Account</button>
         </div>
-        <div id="tokenStatus" class="status small"></div>
+        <div id="plaidStatus" class="status small"></div>
       </div>
 
       <div class="upload-block">

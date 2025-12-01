@@ -28,20 +28,36 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.products import Products
 
-from get_bank_trx import (  # type: ignore
-    PlaidAccessTokenError,
-    PlaidConfigurationError,
-    PlaidCredentials,
-    build_account_filters,
-    create_plaid_client,
-    default_token_store_path,
-    determine_date_range,
-    exchange_public_token,
-    fetch_transactions_for_token,
-    resolve_access_token,
-    serialize_transactions,
-    store_access_token,
-)
+try:
+    from .get_bank_trx import (  # type: ignore
+        PlaidAccessTokenError,
+        PlaidConfigurationError,
+        PlaidCredentials,
+        build_account_filters,
+        create_plaid_client,
+        default_token_store_path,
+        determine_date_range,
+        exchange_public_token,
+        fetch_transactions_for_token,
+        resolve_access_token,
+        serialize_transactions,
+        store_access_token,
+    )
+except ImportError:
+    from get_bank_trx import (  # type: ignore
+        PlaidAccessTokenError,
+        PlaidConfigurationError,
+        PlaidCredentials,
+        build_account_filters,
+        create_plaid_client,
+        default_token_store_path,
+        determine_date_range,
+        exchange_public_token,
+        fetch_transactions_for_token,
+        resolve_access_token,
+        serialize_transactions,
+        store_access_token,
+    )
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

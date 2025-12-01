@@ -71,13 +71,19 @@ except Exception:
 
 try:
     from src.api.bank_data_pipeline import BankDataPipeline  # type: ignore
-except Exception:
+    logging.info("Successfully imported BankDataPipeline from src.api.bank_data_pipeline")
+except Exception as e:
+    logging.warning(f"Failed to import from src.api.bank_data_pipeline: {e}")
     try:
         from ..api.bank_data_pipeline import BankDataPipeline  # type: ignore
-    except Exception:
+        logging.info("Successfully imported BankDataPipeline from ..api.bank_data_pipeline")
+    except Exception as e2:
+        logging.warning(f"Failed to import from ..api.bank_data_pipeline: {e2}")
         try:
             from api.bank_data_pipeline import BankDataPipeline  # type: ignore
-        except Exception:
+            logging.info("Successfully imported BankDataPipeline from api.bank_data_pipeline")
+        except Exception as e3:
+            logging.warning(f"Failed to import from api.bank_data_pipeline: {e3}")
             BankDataPipeline = None  # type: ignore
 
 _bank_pipeline = None

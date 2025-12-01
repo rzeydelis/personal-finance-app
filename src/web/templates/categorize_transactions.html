@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Categorize Transactions</title>
+  <link rel="preconnect" href="https://cdn.plaid.com" />
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
     :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
     body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
@@ -73,12 +75,18 @@
     .llm-toggle label { font-weight:600; color:#334155; cursor:pointer; }
     .llm-input { width:100%; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; margin-bottom:10px; }
     .llm-info { font-size:0.85rem; color:#64748b; margin-top:8px; }
+    .token-block { margin-bottom:20px; }
+    .token-block h2 { margin:0 0 6px 0; font-size:1.1rem; }
+    .token-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
+    .token-actions { display:flex; gap:10px; flex-wrap:wrap; }
   </style>
   <script>
     let allTransactions = [];
     let filteredTransactions = [];
     let uploadedCSV = null;
     let useOpenAI = false;
+    let plaidLinkHandler = null;
+    let plaidLinkToken = null;
 
     function toggleOpenAI(checked) {
       useOpenAI = checked;
@@ -86,6 +94,84 @@
       apiKeyInput.disabled = !checked;
       if (!checked) {
         apiKeyInput.value = '';
+      }
+    }
+
+    async function connectPlaidBank() {
+      const plaidStatus = document.getElementById('plaidStatus');
+      plaidStatus.style.display = 'block';
+      plaidStatus.textContent = '🔄 Initializing Plaid Link...';
+
+      try {
+        // Get a link token from the backend
+        const resp = await fetch('/api/link-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: 'web_user' })
+        });
+        const data = await resp.json();
+        
+        if (!resp.ok || !data.link_token) {
+          throw new Error(data.error || 'Failed to generate link token.');
+        }
+        
+        plaidLinkToken = data.link_token;
+        
+        // Launch Plaid Link
+        if (!window.Plaid || typeof window.Plaid.create !== 'function') {
+          throw new Error('Plaid loader failed to initialize. Check your network connection.');
+        }
+
+        if (plaidLinkHandler && typeof plaidLinkHandler.destroy === 'function') {
+          plaidLinkHandler.destroy();
+        }
+
+        plaidLinkHandler = window.Plaid.create({
+          token: plaidLinkToken,
+          onSuccess: async (publicToken, metadata) => {
+            plaidStatus.textContent = '🔄 Saving bank connection...';
+            
+            try {
+              const payload = { public_token: publicToken };
+              if (metadata && metadata.item_id) {
+                payload.item_id = metadata.item_id;
+              }
+
+              const exchangeResp = await fetch('/api/plaid-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const exchangeData = await exchangeResp.json();
+
+              if (!exchangeResp.ok || !exchangeData.success) {
+                throw new Error(exchangeData.error || 'Failed to save connection.');
+              }
+
+              const institution = metadata && metadata.institution ? metadata.institution.name : 'your bank';
+              plaidStatus.textContent = `✅ Successfully connected to ${institution}! You can now use "Fetch fresh data".`;
+              plaidStatus.style.color = '#059669';
+            } catch (err) {
+              plaidStatus.textContent = `❌ ${err.message}`;
+              plaidStatus.style.color = '#dc2626';
+            }
+          },
+          onExit: (err) => {
+            if (err) {
+              plaidStatus.textContent = `❌ Connection cancelled: ${err.error_message || 'Unknown error'}`;
+              plaidStatus.style.color = '#dc2626';
+            } else {
+              plaidStatus.textContent = 'Connection cancelled.';
+              plaidStatus.style.color = '#6c757d';
+            }
+          }
+        });
+
+        plaidLinkHandler.open();
+        plaidStatus.textContent = 'Opening Plaid Link...';
+      } catch (err) {
+        plaidStatus.textContent = `❌ ${err.message}`;
+        plaidStatus.style.color = '#dc2626';
       }
     }
 
@@ -363,6 +449,15 @@
       <div class="llm-info">
         ℹ️ Your API key is only used for this session and never stored on the server. Default model: gpt-4o-mini
       </div>
+    </div>
+
+    <div class="card token-block" style="background:#f8fbff; border:1px solid #dbe5f6;">
+      <h2>🏦 Connect Your Bank</h2>
+      <p>Click the button below to securely connect your bank account via Plaid. Once connected, you can fetch fresh transactions automatically.</p>
+      <div class="token-actions">
+        <button class="btn" onclick="connectPlaidBank()">🔗 Connect Bank Account</button>
+      </div>
+      <div id="plaidStatus" class="status small"></div>
     </div>
 
     <div class="card upload-block">
