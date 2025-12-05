@@ -12,8 +12,16 @@ OLLAMA_TIMEOUT_SECONDS = int(os.getenv('OLLAMA_TIMEOUT_SECONDS', '5000'))
 
 # OpenAI configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-5.1')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+
+# Available OpenAI models for selection
+AVAILABLE_OPENAI_MODELS = [
+    'gpt-5.1',
+    'gpt-4o',
+    'gpt-5-mini',
+    'gpt-oss-120b',
+]
 
 
 def _post_ollama_generate(payload: Dict[str, Any], timeout_seconds: Optional[int] = None) -> Tuple[bool, Dict[str, Any], Optional[str]]:

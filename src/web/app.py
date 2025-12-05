@@ -17,13 +17,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 try:
     from .llms import generate_json as llm_generate_json
     from .llms import categorize_transactions as llm_categorize_transactions
+    from .llms import AVAILABLE_OPENAI_MODELS
 except Exception:
     try:
         from llms import generate_json as llm_generate_json
         from llms import categorize_transactions as llm_categorize_transactions
+        from llms import AVAILABLE_OPENAI_MODELS
     except Exception:
         llm_generate_json = None
         llm_categorize_transactions = None
+        AVAILABLE_OPENAI_MODELS = ['gpt5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -321,7 +324,7 @@ def parse_csv_transactions(csv_content):
         logging.exception("Error parsing CSV")
         return {'success': False, 'transactions': [], 'count': 0, 'error': f'CSV parsing error: {str(e)}'}
 
-def generate_finance_tip(transactions, openai_api_key=None, use_openai=False):
+def generate_finance_tip(transactions, openai_api_key=None, use_openai=False, model=None):
     """Generate personalized finance tip using LLM"""
     if not llm_generate_json:
         return {'success': False, 'analysis': {}, 'error': 'LLM not available'}
@@ -388,7 +391,7 @@ Expanded Analysis Rules (including month-over-month support)
     7. Stay strictly grounded in the provided data—do not invent charges, categories, or memberships."""
     try:
         # print(f"Prompt: {prompt}")
-        result = llm_generate_json(prompt, openai_api_key=openai_api_key, use_openai=use_openai)
+        result = llm_generate_json(prompt, model=model, openai_api_key=openai_api_key, use_openai=use_openai)
         if result.get('success'):
             return {'success': True, 'analysis': result.get('data', {}), 'error': None}
         return {'success': False, 'analysis': {}, 'error': result.get('error', 'Unknown error')}
@@ -473,6 +476,15 @@ def create_link_token_api():
         return jsonify({'error': f'Failed to create link token: {exc}'}), 500
 
 
+@app.route('/api/models', methods=['GET'])
+def get_available_models():
+    """Return list of available OpenAI models"""
+    return jsonify({
+        'models': AVAILABLE_OPENAI_MODELS,
+        'default': 'gpt5'
+    })
+
+
 @app.route('/')
 def index():
     """Home page - Finance tip page"""
@@ -506,6 +518,7 @@ def get_finance_tip():
         csv_data = data.get('csv_data', '')
         openai_api_key = data.get('openai_api_key', '')
         use_openai = data.get('use_openai', False)
+        model = data.get('model', '')
         
         if use_csv and csv_data:
             # Parse CSV data directly
@@ -547,7 +560,7 @@ def get_finance_tip():
         if not transactions:
             return jsonify({'error': 'No transactions within lookback window'}), 400
         
-        tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai)
+        tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai, model=model)
         
         return jsonify({
             'success': tip_result['success'],
@@ -576,6 +589,7 @@ def categorize_transactions_api():
         csv_data = data.get('csv_data', '')
         openai_api_key = data.get('openai_api_key', '')
         use_openai = data.get('use_openai', False)
+        model = data.get('model', '')
         
         if use_csv and csv_data:
             # Parse CSV data directly
@@ -621,6 +635,7 @@ def categorize_transactions_api():
         logging.info(f"Categorizing {len(transactions)} transactions...")
         categorization_result = llm_categorize_transactions(
             transactions,
+            model=model,
             openai_api_key=openai_api_key,
             use_openai=use_openai
         )
