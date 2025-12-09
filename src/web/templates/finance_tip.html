@@ -702,7 +702,7 @@
               <div class="field">
                 <label>Model</label>
                 <select id="modelSelect" disabled>
-                  <option value="gpt5">gpt5</option>
+                  <option value="gpt-5-mini">gpt-5-mini (default)</option>
                 </select>
               </div>
               <div class="field">
@@ -758,7 +758,7 @@
   <script>
     let uploadedCSV = null;
     let useOpenAI = false;
-    let selectedModel = 'gpt5';
+    let selectedModel = 'gpt-5-mini';
     let currentSource = 'bank';
 
     // Initialize
@@ -777,7 +777,7 @@
           const opt = document.createElement('option');
           opt.value = model;
           opt.textContent = model;
-          if (model === (data.default || 'gpt5')) {
+          if (model === (data.default || 'gpt-5-mini')) {
             opt.selected = true;
             selectedModel = model;
           }

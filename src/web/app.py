@@ -481,7 +481,7 @@ def get_available_models():
     """Return list of available OpenAI models"""
     return jsonify({
         'models': AVAILABLE_OPENAI_MODELS,
-        'default': 'gpt5'
+        'default': 'gpt-5-mini'
     })
 
 
@@ -568,6 +568,7 @@ def get_finance_tip():
             'transaction_count': len(transactions),
             'lookback_days': lookback_days,
             'tip_analysis': tip_result.get('analysis', {}),
+            'error': tip_result.get('error'),
             'error': tip_result.get('error'),
             'timestamp': datetime.now().isoformat()
         })
