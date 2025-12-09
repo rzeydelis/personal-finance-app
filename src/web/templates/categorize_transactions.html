@@ -613,6 +613,170 @@
     .empty-icon { font-size: 3rem; margin-bottom: 12px; }
     .empty-text { font-size: 0.95rem; }
 
+    /* Email Signup Section */
+    .signup-card {
+      background: linear-gradient(135deg, #1a1a24 0%, var(--bg-card) 100%);
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      margin-top: 32px;
+    }
+
+    .signup-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #10b981, #06b6d4, #6366f1);
+    }
+
+    .signup-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .signup-icon {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .signup-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: var(--text);
+    }
+
+    .signup-description {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .signup-description strong {
+      color: var(--text);
+    }
+
+    .privacy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .signup-form {
+      margin-bottom: 20px;
+    }
+
+    .signup-fields {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .signup-input {
+      flex: 1;
+      min-width: 180px;
+      padding: 14px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .signup-input:focus {
+      border-color: var(--success);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    .signup-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .btn-signup {
+      background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+      color: white;
+      padding: 14px 28px;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+      white-space: nowrap;
+    }
+
+    .btn-signup:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-signup:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .signup-status {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .signup-status.visible {
+      display: block;
+    }
+
+    .signup-status.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .signup-status.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .signup-features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .feature-icon {
+      font-size: 1rem;
+    }
+
     @media (max-width: 768px) {
       nav { padding: 12px 16px; }
       main { padding: 0 16px 40px; }
@@ -621,6 +785,10 @@
       .action-row .btn { width: 100%; justify-content: center; }
       .source-tabs { flex-direction: column; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .signup-content { flex-direction: column; gap: 12px; }
+      .signup-fields { flex-direction: column; }
+      .signup-input { min-width: 100%; }
+      .btn-signup { width: 100%; justify-content: center; }
     }
   </style>
 </head>
@@ -712,7 +880,7 @@
               <div class="field">
                 <label>Model</label>
                 <select id="modelSelect" disabled>
-                  <option value="gpt5">gpt5</option>
+                  <option value="gpt-5-mini">gpt-5-mini (default)</option>
                 </select>
               </div>
               <div class="field">
@@ -794,6 +962,61 @@
           </div>
         </div>
       </div>
+
+      <!-- Email Signup Section -->
+      <div class="card signup-card">
+        <div class="signup-content">
+          <div class="signup-icon">🚀</div>
+          <div class="signup-text">
+            <h2 class="signup-title">Want us to handle everything?</h2>
+            <p class="signup-description">
+              Join the waitlist for our <strong>hosted service</strong> — we run the AI analysis for you with 
+              <span class="privacy-badge">🔒 zero data storage</span>. Your financial data is processed in real-time and never stored on our servers.
+            </p>
+          </div>
+        </div>
+        
+        <form class="signup-form" id="signupForm" onsubmit="handleSignup(event)">
+          <div class="signup-fields">
+            <input 
+              type="text" 
+              id="signupName" 
+              placeholder="Your name (optional)" 
+              class="signup-input"
+            />
+            <input 
+              type="email" 
+              id="signupEmail" 
+              placeholder="your@email.com" 
+              class="signup-input"
+              required
+            />
+            <button type="submit" class="btn btn-signup" id="signupBtn">
+              Join Waitlist
+            </button>
+          </div>
+          <div class="signup-status" id="signupStatus"></div>
+        </form>
+        
+        <div class="signup-features">
+          <div class="feature-item">
+            <span class="feature-icon">⚡</span>
+            <span>Instant analysis</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🔐</span>
+            <span>Privacy-first</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🏦</span>
+            <span>Bank-grade security</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🗑️</span>
+            <span>Data deleted after processing</span>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -802,7 +1025,7 @@
     let filteredTransactions = [];
     let uploadedCSV = null;
     let useOpenAI = false;
-    let selectedModel = 'gpt5';
+    let selectedModel = 'gpt-5-mini';
     let currentSource = 'bank';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -820,7 +1043,7 @@
           const opt = document.createElement('option');
           opt.value = model;
           opt.textContent = model;
-          if (model === (data.default || 'gpt5')) {
+          if (model === (data.default || 'gpt-5-mini')) {
             opt.selected = true;
             selectedModel = model;
           }
@@ -1075,6 +1298,62 @@
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    // Email signup handler
+    async function handleSignup(event) {
+      event.preventDefault();
+      
+      const btn = document.getElementById('signupBtn');
+      const statusEl = document.getElementById('signupStatus');
+      const emailInput = document.getElementById('signupEmail');
+      const nameInput = document.getElementById('signupName');
+      
+      const email = emailInput.value.trim();
+      const name = nameInput.value.trim();
+      
+      if (!email) {
+        showSignupStatus('error', 'Please enter your email address');
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.textContent = 'Joining...';
+      
+      try {
+        const resp = await fetch('/api/email-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name, source: 'categorize' })
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+          showSignupStatus('success', data.message || "You're on the list! We'll be in touch soon.");
+          emailInput.value = '';
+          nameInput.value = '';
+        } else {
+          showSignupStatus('error', data.error || 'Signup failed. Please try again.');
+        }
+      } catch (e) {
+        showSignupStatus('error', 'Connection error. Please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Join Waitlist';
+      }
+    }
+
+    function showSignupStatus(type, message) {
+      const statusEl = document.getElementById('signupStatus');
+      statusEl.className = 'signup-status visible ' + type;
+      statusEl.textContent = message;
+      
+      if (type === 'success') {
+        setTimeout(() => {
+          statusEl.classList.remove('visible');
+        }, 5000);
+      }
     }
   </script>
 </body>

@@ -1,4 +1,5 @@
 import csv
+import json
 import logging
 import re
 import sys
@@ -574,6 +575,91 @@ def get_finance_tip():
         })
     except Exception as e:
         return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
+
+
+# ==================== EMAIL SIGNUP ====================
+
+# File to store email signups
+EMAIL_SIGNUPS_FILE = Path(__file__).parent / 'email_signups.json'
+
+
+def load_email_signups():
+    """Load existing email signups from file"""
+    if EMAIL_SIGNUPS_FILE.exists():
+        try:
+            with open(EMAIL_SIGNUPS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def save_email_signup(email, name=None, source='web_app'):
+    """Save a new email signup"""
+    signups = load_email_signups()
+    
+    # Check if email already exists
+    existing_emails = [s.get('email', '').lower() for s in signups]
+    if email.lower() in existing_emails:
+        return {'success': False, 'error': 'Email already registered'}
+    
+    signup = {
+        'email': email,
+        'name': name,
+        'signed_up_at': datetime.now().isoformat(),
+        'source': source
+    }
+    signups.append(signup)
+    
+    try:
+        with open(EMAIL_SIGNUPS_FILE, 'w') as f:
+            json.dump(signups, f, indent=2)
+        return {'success': True}
+    except IOError as e:
+        return {'success': False, 'error': f'Failed to save: {str(e)}'}
+
+
+@app.route('/api/email-signup', methods=['POST'])
+def email_signup():
+    """Handle email signup for paid hosted version waitlist"""
+    try:
+        data = request.get_json() or {}
+    except Exception:
+        data = {}
+    
+    email = (data.get('email') or '').strip().lower()
+    name = (data.get('name') or '').strip() or None
+    source = (data.get('source') or '').strip() or 'web_app'
+    
+    # Validate source
+    valid_sources = ['insights', 'categorize', 'web_app']
+    if source not in valid_sources:
+        source = 'web_app'
+    
+    # Validate email
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+    
+    # Basic email validation
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_pattern, email):
+        return jsonify({'error': 'Please enter a valid email address'}), 400
+    
+    result = save_email_signup(email, name, source)
+    
+    if result['success']:
+        logging.info(f"New email signup: {email}")
+        return jsonify({
+            'success': True,
+            'message': "Thanks for signing up! We'll notify you when our hosted service launches."
+        })
+    else:
+        if 'already registered' in result.get('error', ''):
+            return jsonify({
+                'success': True,
+                'message': "You're already on the list! We'll be in touch soon."
+            })
+        return jsonify({'error': result.get('error', 'Signup failed')}), 500
 
 
 @app.route('/api/categorize-transactions', methods=['POST'])
