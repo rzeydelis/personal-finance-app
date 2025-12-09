@@ -4,247 +4,923 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Categorize Transactions</title>
-  <link rel="preconnect" href="https://cdn.plaid.com" />
-  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
   <style>
-    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
-    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
-    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:14px 20px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
-    .topbar .inner { max-width: 1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
-    .brand { font-weight:700; letter-spacing:.2px; }
-    .nav a { color:#e9f2ff; text-decoration:none; margin-left:16px; font-weight:600; }
-    .nav a:hover { text-decoration:underline; }
-    .wrap { max-width: 1200px; margin: 26px auto; padding: 0 16px; }
-    .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,.08); padding:22px; margin-bottom:20px; }
-    .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
-    .header h1 { margin:0; font-size:1.4rem; }
-    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; }
-    .toggle { display:flex; align-items:center; gap:8px; background:#f5f7fb; border:1px solid #e6eaef; padding:8px 10px; border-radius:10px; }
-    .num { width:90px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:10px; }
-    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); transition:transform 0.1s; }
-    .btn:hover { transform: translateY(-1px); }
-    .btn:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; transform: none; }
-    .btn-secondary { background:#eef2f7; color:#0b5ed7; border:1px solid #d8e1ee; box-shadow:none; }
-    .status { margin-top:10px; display:none; color:var(--muted); }
-    .status.small { font-size:0.85rem; }
-    .spinner { width:32px; height:32px; border:3px solid #e9eef6; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; display:inline-block; vertical-align:middle; }
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-light: #818cf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .icon {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-glow);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: #2a2a35; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+    }
+
+    .btn-ghost:hover { color: var(--text); }
+
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px 12px;
+    }
+
+    .input-group label {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .input-group input[type="number"] {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      width: 60px;
+      padding: 8px 0;
+      outline: none;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 11px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    .toggle-label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .status {
+      display: none;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      margin-top: 16px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status.visible { display: flex; }
+
+    .status.loading {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
-    
-    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px; }
-    .summary-card { background:#f8fbff; border:1px solid #dbe5f6; border-radius:10px; padding:14px; }
-    .summary-card .label { font-size:0.85rem; color:var(--muted); margin-bottom:4px; }
-    .summary-card .value { font-size:1.6rem; font-weight:800; color:var(--brand); }
-    .summary-card .detail { font-size:0.9rem; color:#5b6c82; margin-top:4px; }
-    
-    .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; align-items:center; }
-    .filter-bar select, .filter-bar input { padding:8px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; }
-    .filter-bar label { font-weight:600; color:#334155; }
-    
-    .transactions-table { width:100%; border-collapse:collapse; margin-top:10px; }
-    .transactions-table th { background:#f7f9fc; padding:12px; text-align:left; font-weight:700; border-bottom:2px solid #e6eaef; position:sticky; top:0; }
-    .transactions-table td { padding:10px 12px; border-bottom:1px solid #f0f3f7; }
-    .transactions-table tr:hover { background:#f9fbfd; }
-    .category-badge { display:inline-block; padding:4px 10px; border-radius:6px; font-size:0.85rem; font-weight:600; }
-    .confidence-high { background:#d1fae5; color:#065f46; }
-    .confidence-medium { background:#fed7aa; color:#92400e; }
-    .confidence-low { background:#fecaca; color:#991b1b; }
-    
-    .amount-positive { color:#059669; font-weight:700; }
-    .amount-negative { color:#dc2626; font-weight:700; }
-    
-    .empty-state { text-align:center; padding:40px; color:var(--muted); }
-    .empty-state-icon { font-size:3rem; margin-bottom:10px; }
-    
-    .export-actions { display:flex; gap:10px; flex-wrap:wrap; }
-    .upload-block { margin-bottom:20px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:14px; padding:18px; }
-    .upload-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#0369a1; }
-    .upload-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
-    .file-input-wrapper { position:relative; display:inline-block; }
-    .file-input { position:absolute; opacity:0; width:0; height:0; }
-    .file-label { display:inline-block; padding:10px 16px; background:#0ea5e9; color:#fff; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(14,165,233,.25); transition:all 0.2s; }
-    .file-label:hover { background:#0284c7; transform:translateY(-1px); }
-    .file-name { margin-left:12px; color:#334155; font-size:0.95rem; }
-    .upload-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-    .sample-format { margin-top:12px; padding:10px; background:#fefce8; border:1px solid #fde047; border-radius:8px; font-size:0.85rem; color:#854d0e; }
-    .sample-format code { background:#fef3c7; padding:2px 4px; border-radius:4px; }
-    .llm-block { margin-bottom:20px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:18px; }
-    .llm-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#166534; }
-    .llm-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
-    .llm-toggle { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-    .llm-toggle input[type="checkbox"] { width:20px; height:20px; cursor:pointer; }
-    .llm-toggle label { font-weight:600; color:#334155; cursor:pointer; }
-    .llm-input { width:100%; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; margin-bottom:10px; }
-    .llm-info { font-size:0.85rem; color:#64748b; margin-top:8px; }
-    .token-block { margin-bottom:20px; }
-    .token-block h2 { margin:0 0 6px 0; font-size:1.1rem; }
-    .token-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
-    .token-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+    .collapsible {
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+
+    .collapsible-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 8px 0;
+    }
+
+    .collapsible-trigger:hover { color: var(--text); }
+    .collapsible-trigger .arrow { transition: transform 0.2s; }
+    .collapsible-trigger.open .arrow { transform: rotate(180deg); }
+
+    .collapsible-content {
+      display: none;
+      padding-top: 16px;
+    }
+
+    .collapsible-content.open { display: block; }
+
+    .source-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .source-tab {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .source-tab:hover { border-color: var(--text-dim); }
+
+    .source-tab.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .source-tab .tab-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .source-tab .tab-label { font-size: 0.85rem; color: var(--text-muted); }
+    .source-tab.active .tab-label { color: var(--text); }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-drop:hover, .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .file-drop-text { color: var(--text-muted); font-size: 0.9rem; }
+    .file-drop-text strong { color: var(--accent-light); }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg);
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+
+    .file-info.visible { display: flex; }
+    .file-info .file-name { flex: 1; font-size: 0.9rem; }
+    .file-info .file-status { color: var(--success); font-size: 0.85rem; }
+
+    .settings-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .settings-row .field {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field input:disabled, .field select:disabled { opacity: 0.5; }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+    }
+
+    /* Results */
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .stat-value.accent { color: var(--accent-light); }
+    .stat-value.success { color: var(--success); }
+
+    .stat-detail {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Table */
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .table-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .filter-bar select, .filter-bar input {
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .filter-bar input { flex: 1; min-width: 200px; }
+    .filter-bar input::placeholder { color: var(--text-dim); }
+
+    .result-count {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
+    th {
+      background: var(--bg);
+      padding: 14px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: var(--bg-hover); }
+
+    .amount-positive { color: var(--success); font-weight: 600; }
+    .amount-negative { color: var(--error); font-weight: 600; }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .badge-category {
+      background: var(--accent-glow);
+      color: var(--accent-light);
+    }
+
+    .badge-high {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .badge-medium {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    .badge-low {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+
+    .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-text { font-size: 0.95rem; }
+
+    @media (max-width: 768px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero h1 { font-size: 1.5rem; }
+      .action-row { flex-direction: column; }
+      .action-row .btn { width: 100%; justify-content: center; }
+      .source-tabs { flex-direction: column; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
   </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">
+        <div class="logo-icon">💰</div>
+        <span>FinanceAI</span>
+      </div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
+        <a href="/categorize" class="active">Categorize</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <div class="hero">
+        <h1>Categorize Transactions</h1>
+        <p>AI-powered categorization to understand your spending</p>
+      </div>
+
+      <!-- Data Source Selection -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="icon">📊</div>
+            Choose Data Source
+          </div>
+        </div>
+
+        <div class="source-tabs">
+          <div class="source-tab active" onclick="selectSource('bank')" id="tabBank">
+            <div class="tab-icon">🏦</div>
+            <div class="tab-label">Connected Bank</div>
+          </div>
+          <div class="source-tab" onclick="selectSource('csv')" id="tabCSV">
+            <div class="tab-icon">📄</div>
+            <div class="tab-label">Upload CSV</div>
+          </div>
+        </div>
+
+        <div id="bankSource">
+          <div class="action-row">
+            <label class="toggle">
+              <input type="checkbox" id="fetchFresh" />
+              <span class="toggle-track"></span>
+              <span class="toggle-label">Fetch fresh data from bank</span>
+            </label>
+            <div class="input-group">
+              <label>Days:</label>
+              <input type="number" id="lookback" value="90" min="7" max="365" />
+            </div>
+          </div>
+        </div>
+
+        <div id="csvSource" style="display: none;">
+          <div class="file-drop" onclick="document.getElementById('csvInput').click()" id="fileDrop">
+            <div class="file-drop-icon">📁</div>
+            <div class="file-drop-text">
+              <strong>Click to upload</strong> or drag and drop<br>
+              CSV file with date, name, and amount columns
+            </div>
+          </div>
+          <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
+          <div class="file-info" id="fileInfo">
+            <span>📄</span>
+            <span class="file-name" id="fileName"></span>
+            <span class="file-status">✓ Ready</span>
+            <button class="btn-ghost" onclick="clearFile()">✕</button>
+          </div>
+        </div>
+
+        <div class="collapsible">
+          <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
+            <span>⚙️ AI Settings</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="collapsible-content">
+            <div style="margin-bottom: 16px;">
+              <label class="toggle">
+                <input type="checkbox" id="useOpenAI" onchange="toggleOpenAI(this.checked)" />
+                <span class="toggle-track"></span>
+                <span class="toggle-label">Use OpenAI (requires API key)</span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <div class="field">
+                <label>Model</label>
+                <select id="modelSelect" disabled>
+                  <option value="gpt5">gpt5</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>API Key</label>
+                <input type="password" id="openaiApiKey" placeholder="sk-..." disabled />
+              </div>
+            </div>
+            <p class="hint">By default, uses local Ollama. Enable OpenAI for cloud-based analysis.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categorize Button -->
+      <div class="card">
+        <div class="action-row">
+          <button class="btn btn-primary" id="categorizeBtn" onclick="categorizeTransactions()">
+            🏷️ Categorize Transactions
+          </button>
+        </div>
+        <div class="status" id="status">
+          <div class="spinner"></div>
+          <span id="statusText">Categorizing your transactions...</span>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="results" id="results">
+        <!-- Summary Stats -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom: 16px;">
+            <div class="icon">📈</div>
+            Summary
+          </div>
+          <div class="stats-grid" id="statsGrid"></div>
+        </div>
+
+        <!-- Transactions Table -->
+        <div class="card">
+          <div class="table-header">
+            <div class="table-title">Transactions</div>
+            <div class="table-actions">
+              <button class="btn btn-secondary" onclick="exportToCSV()">📥 Export CSV</button>
+              <button class="btn btn-secondary" onclick="exportToJSON()">📥 Export JSON</button>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <select id="categoryFilter" onchange="filterTransactions()">
+              <option value="">All Categories</option>
+            </select>
+            <input type="text" id="searchFilter" placeholder="Search transactions..." oninput="filterTransactions()" />
+          </div>
+
+          <div class="result-count" id="resultCount"></div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Amount</th>
+                  <th>Account</th>
+                  <th>Category</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">🔍</div>
+                      <div class="empty-text">Click "Categorize Transactions" to analyze your spending</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
   <script>
     let allTransactions = [];
     let filteredTransactions = [];
     let uploadedCSV = null;
     let useOpenAI = false;
-    let plaidLinkHandler = null;
-    let plaidLinkToken = null;
+    let selectedModel = 'gpt5';
+    let currentSource = 'bank';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadModels();
+      setupDragDrop();
+    });
+
+    async function loadModels() {
+      try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '';
+        (data.models || []).forEach(model => {
+          const opt = document.createElement('option');
+          opt.value = model;
+          opt.textContent = model;
+          if (model === (data.default || 'gpt5')) {
+            opt.selected = true;
+            selectedModel = model;
+          }
+          select.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Failed to load models:', e);
+      }
+    }
+
+    function selectSource(source) {
+      currentSource = source;
+      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
+      document.getElementById('tabCSV').classList.toggle('active', source === 'csv');
+      document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
+      document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
+    }
+
+    function toggleCollapsible(trigger) {
+      trigger.classList.toggle('open');
+      trigger.nextElementSibling.classList.toggle('open');
+    }
 
     function toggleOpenAI(checked) {
       useOpenAI = checked;
-      const apiKeyInput = document.getElementById('openaiApiKey');
-      apiKeyInput.disabled = !checked;
-      if (!checked) {
-        apiKeyInput.value = '';
-      }
+      document.getElementById('openaiApiKey').disabled = !checked;
+      document.getElementById('modelSelect').disabled = !checked;
     }
 
-    async function connectPlaidBank() {
-      const plaidStatus = document.getElementById('plaidStatus');
-      plaidStatus.style.display = 'block';
-      plaidStatus.textContent = '🔄 Initializing Plaid Link...';
-
-      try {
-        // Get a link token from the backend
-        const resp = await fetch('/api/link-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: 'web_user' })
-        });
-        const data = await resp.json();
-        
-        if (!resp.ok || !data.link_token) {
-          throw new Error(data.error || 'Failed to generate link token.');
-        }
-        
-        plaidLinkToken = data.link_token;
-        
-        // Launch Plaid Link
-        if (!window.Plaid || typeof window.Plaid.create !== 'function') {
-          throw new Error('Plaid loader failed to initialize. Check your network connection.');
-        }
-
-        if (plaidLinkHandler && typeof plaidLinkHandler.destroy === 'function') {
-          plaidLinkHandler.destroy();
-        }
-
-        plaidLinkHandler = window.Plaid.create({
-          token: plaidLinkToken,
-          onSuccess: async (publicToken, metadata) => {
-            plaidStatus.textContent = '🔄 Saving bank connection...';
-            
-            try {
-              const payload = { public_token: publicToken };
-              if (metadata && metadata.item_id) {
-                payload.item_id = metadata.item_id;
-              }
-
-              const exchangeResp = await fetch('/api/plaid-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              const exchangeData = await exchangeResp.json();
-
-              if (!exchangeResp.ok || !exchangeData.success) {
-                throw new Error(exchangeData.error || 'Failed to save connection.');
-              }
-
-              const institution = metadata && metadata.institution ? metadata.institution.name : 'your bank';
-              plaidStatus.textContent = `✅ Successfully connected to ${institution}! You can now use "Fetch fresh data".`;
-              plaidStatus.style.color = '#059669';
-            } catch (err) {
-              plaidStatus.textContent = `❌ ${err.message}`;
-              plaidStatus.style.color = '#dc2626';
-            }
-          },
-          onExit: (err) => {
-            if (err) {
-              plaidStatus.textContent = `❌ Connection cancelled: ${err.error_message || 'Unknown error'}`;
-              plaidStatus.style.color = '#dc2626';
-            } else {
-              plaidStatus.textContent = 'Connection cancelled.';
-              plaidStatus.style.color = '#6c757d';
-            }
-          }
-        });
-
-        plaidLinkHandler.open();
-        plaidStatus.textContent = 'Opening Plaid Link...';
-      } catch (err) {
-        plaidStatus.textContent = `❌ ${err.message}`;
-        plaidStatus.style.color = '#dc2626';
-      }
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(e => {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(e => {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('dragover'); });
+      });
+      drop.addEventListener('drop', ev => {
+        const file = ev.dataTransfer.files[0];
+        if (file) processFile(file);
+      });
     }
 
-    function handleFileUpload(event) {
+    function handleFileSelect(event) {
       const file = event.target.files[0];
-      const fileNameDisplay = document.getElementById('fileName');
-      const uploadStatus = document.getElementById('uploadStatus');
-      const categorizeBtn = document.getElementById('categorizeBtn');
-      
-      if (!file) {
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
-        uploadStatus.style.display = 'none';
-        return;
-      }
-      
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
       if (!file.name.toLowerCase().endsWith('.csv')) {
-        uploadStatus.style.display = 'block';
-        uploadStatus.textContent = '❌ Please upload a CSV file';
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
+        showStatus('error', 'Please upload a CSV file');
         return;
       }
-      
-      fileNameDisplay.textContent = `📄 ${file.name}`;
-      uploadStatus.style.display = 'block';
-      uploadStatus.textContent = '🔄 Reading CSV file...';
-      
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = e => {
         uploadedCSV = e.target.result;
-        uploadStatus.textContent = '✅ CSV loaded successfully';
-        uploadStatus.style.color = '#059669';
-        categorizeBtn.textContent = 'Categorize CSV';
-      };
-      reader.onerror = function() {
-        uploadStatus.textContent = '❌ Failed to read file';
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('visible');
+        document.getElementById('fileDrop').style.display = 'none';
       };
       reader.readAsText(file);
     }
 
-    function clearUpload() {
+    function clearFile() {
       uploadedCSV = null;
-      document.getElementById('csvFileInput').value = '';
-      document.getElementById('fileName').textContent = '';
-      document.getElementById('uploadStatus').style.display = 'none';
-      document.getElementById('categorizeBtn').textContent = 'Categorize';
+      document.getElementById('csvInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('fileDrop').style.display = 'block';
     }
 
-    async function categorizeTransactions(fetchFresh) {
+    function showStatus(type, message) {
       const status = document.getElementById('status');
-      const resultsSection = document.getElementById('results');
-      const btn = document.getElementById('categorizeBtn');
-      const lookback = document.getElementById('lookback').value || 90;
-      const openaiApiKey = document.getElementById('openaiApiKey').value.trim();
+      const text = document.getElementById('statusText');
+      status.className = 'status visible ' + type;
+      text.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+    }
 
-      resultsSection.style.display = 'none';
-      status.style.display = 'block';
-      status.innerHTML = '<span class="spinner"></span>Categorizing your transactions...';
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    async function categorizeTransactions() {
+      const btn = document.getElementById('categorizeBtn');
+      const results = document.getElementById('results');
+
       btn.disabled = true;
+      results.classList.remove('visible');
+      showStatus('loading', 'Categorizing your transactions...');
 
       try {
         const payload = {
-          fetch_fresh: !!fetchFresh,
-          lookback_days: parseInt(lookback, 10),
+          fetch_fresh: document.getElementById('fetchFresh').checked,
+          lookback_days: parseInt(document.getElementById('lookback').value) || 90,
           use_openai: useOpenAI,
-          openai_api_key: openaiApiKey
+          openai_api_key: document.getElementById('openaiApiKey').value.trim(),
+          model: useOpenAI ? selectedModel : ''
         };
-        
-        // If CSV is uploaded, use that instead
-        if (uploadedCSV) {
+
+        if (currentSource === 'csv' && uploadedCSV) {
           payload.use_csv = true;
           payload.csv_data = uploadedCSV;
           payload.fetch_fresh = false;
@@ -255,290 +931,151 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+
         const data = await resp.json();
-        
-        if (!data.success) throw new Error(data.error || 'Failed to categorize transactions');
-        
+        if (!data.success) throw new Error(data.error || 'Failed to categorize');
+
         allTransactions = data.transactions || [];
         filteredTransactions = [...allTransactions];
-        
+
         renderSummary(data.category_summary || {});
         renderTransactions();
-        
-        resultsSection.style.display = 'block';
-        status.style.display = 'none';
+        populateCategoryFilter(data.category_summary || {});
+
+        hideStatus();
+        results.classList.add('visible');
         btn.disabled = false;
       } catch (e) {
-        status.innerHTML = `❌ ${e.message}`;
+        showStatus('error', e.message);
         btn.disabled = false;
       }
     }
 
-    function renderSummary(categorySummary) {
-      const summaryGrid = document.getElementById('summaryGrid');
-      const totalTransactions = Object.values(categorySummary).reduce((sum, cat) => sum + cat.count, 0);
-      const totalSpending = Object.values(categorySummary).reduce((sum, cat) => sum + cat.total, 0);
-      
-      const sortedCategories = Object.entries(categorySummary)
-        .sort((a, b) => b[1].total - a[1].total)
-        .slice(0, 5);
-      
+    function renderSummary(summary) {
+      const grid = document.getElementById('statsGrid');
+      const total = Object.values(summary).reduce((s, c) => s + c.count, 0);
+      const totalSpend = Object.values(summary).reduce((s, c) => s + c.total, 0);
+      const categories = Object.keys(summary).length;
+
+      const top = Object.entries(summary).sort((a, b) => b[1].total - a[1].total).slice(0, 3);
+
       let html = `
-        <div class="summary-card">
-          <div class="label">Total Transactions</div>
-          <div class="value">${totalTransactions}</div>
+        <div class="stat-card">
+          <div class="stat-label">Transactions</div>
+          <div class="stat-value accent">${total}</div>
         </div>
-        <div class="summary-card">
-          <div class="label">Total Spending</div>
-          <div class="value">$${totalSpending.toFixed(2)}</div>
+        <div class="stat-card">
+          <div class="stat-label">Total Spending</div>
+          <div class="stat-value">$${totalSpend.toFixed(2)}</div>
         </div>
-        <div class="summary-card">
-          <div class="label">Categories</div>
-          <div class="value">${Object.keys(categorySummary).length}</div>
+        <div class="stat-card">
+          <div class="stat-label">Categories</div>
+          <div class="stat-value">${categories}</div>
         </div>
       `;
-      
-      sortedCategories.forEach(([category, stats]) => {
+
+      top.forEach(([cat, stats]) => {
         html += `
-          <div class="summary-card">
-            <div class="label">${category}</div>
-            <div class="value">$${stats.total.toFixed(2)}</div>
-            <div class="detail">${stats.count} transactions</div>
+          <div class="stat-card">
+            <div class="stat-label">${cat}</div>
+            <div class="stat-value">$${stats.total.toFixed(2)}</div>
+            <div class="stat-detail">${stats.count} transactions</div>
           </div>
         `;
       });
-      
-      summaryGrid.innerHTML = html;
-      
-      // Populate category filter
-      const categoryFilter = document.getElementById('categoryFilter');
-      categoryFilter.innerHTML = '<option value="">All Categories</option>';
-      Object.keys(categorySummary).sort().forEach(cat => {
-        categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+
+      grid.innerHTML = html;
+    }
+
+    function populateCategoryFilter(summary) {
+      const filter = document.getElementById('categoryFilter');
+      filter.innerHTML = '<option value="">All Categories</option>';
+      Object.keys(summary).sort().forEach(cat => {
+        filter.innerHTML += `<option value="${cat}">${cat}</option>`;
       });
     }
 
     function renderTransactions() {
-      const tbody = document.getElementById('transactionsBody');
-      
+      const tbody = document.getElementById('tableBody');
+
       if (filteredTransactions.length === 0) {
         tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="empty-state">
-              <div class="empty-state-icon">📭</div>
-              <div>No transactions found</div>
-            </td>
-          </tr>
+          <tr><td colspan="6">
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <div class="empty-text">No transactions found</div>
+            </div>
+          </td></tr>
         `;
         return;
       }
-      
-      const html = filteredTransactions.map(trx => {
-        const amount = trx.amount || 0;
-        const amountClass = amount < 0 ? 'amount-positive' : 'amount-negative';
-        const confidenceClass = `confidence-${trx.confidence || 'low'}`;
-        const category = trx.category || 'Other';
-        const subcategory = trx.subcategory || '';
-        
+
+      tbody.innerHTML = filteredTransactions.map(trx => {
+        const amt = trx.amount || 0;
+        const amtClass = amt < 0 ? 'amount-positive' : 'amount-negative';
+        const confClass = `badge-${trx.confidence || 'low'}`;
+
         return `
           <tr>
             <td>${trx.date || 'N/A'}</td>
             <td>${trx.name || trx.merchant || 'Unknown'}</td>
-            <td class="${amountClass}">$${Math.abs(amount).toFixed(2)}</td>
+            <td class="${amtClass}">$${Math.abs(amt).toFixed(2)}</td>
             <td>${trx.account_name || trx.account || 'Unknown'}</td>
             <td>
-              <span class="category-badge" style="background:#e0f2fe; color:#075985;">${category}</span>
-              ${subcategory ? `<br><small style="color:#64748b;">${subcategory}</small>` : ''}
+              <span class="badge badge-category">${trx.category || 'Other'}</span>
+              ${trx.subcategory ? `<br><small style="color:var(--text-muted)">${trx.subcategory}</small>` : ''}
             </td>
-            <td><span class="category-badge ${confidenceClass}">${trx.confidence || 'low'}</span></td>
+            <td><span class="badge ${confClass}">${trx.confidence || 'low'}</span></td>
           </tr>
         `;
       }).join('');
-      
-      tbody.innerHTML = html;
-      
+
       document.getElementById('resultCount').textContent = 
         `Showing ${filteredTransactions.length} of ${allTransactions.length} transactions`;
     }
 
     function filterTransactions() {
-      const categoryFilter = document.getElementById('categoryFilter').value;
-      const searchText = document.getElementById('searchFilter').value.toLowerCase();
-      
+      const cat = document.getElementById('categoryFilter').value;
+      const search = document.getElementById('searchFilter').value.toLowerCase();
+
       filteredTransactions = allTransactions.filter(trx => {
-        const matchesCategory = !categoryFilter || trx.category === categoryFilter;
-        const matchesSearch = !searchText || 
-          (trx.name || '').toLowerCase().includes(searchText) ||
-          (trx.merchant || '').toLowerCase().includes(searchText) ||
-          (trx.category || '').toLowerCase().includes(searchText);
-        return matchesCategory && matchesSearch;
+        const matchCat = !cat || trx.category === cat;
+        const matchSearch = !search || 
+          (trx.name || '').toLowerCase().includes(search) ||
+          (trx.merchant || '').toLowerCase().includes(search) ||
+          (trx.category || '').toLowerCase().includes(search);
+        return matchCat && matchSearch;
       });
-      
+
       renderTransactions();
     }
 
     function exportToCSV() {
-      if (filteredTransactions.length === 0) {
-        alert('No transactions to export');
-        return;
-      }
-      
+      if (!filteredTransactions.length) return alert('No transactions to export');
       const headers = ['Date', 'Name', 'Amount', 'Account', 'Category', 'Subcategory', 'Confidence'];
-      const rows = filteredTransactions.map(trx => [
-        trx.date || '',
-        trx.name || trx.merchant || '',
-        (trx.amount || 0).toFixed(2),
-        trx.account_name || trx.account || '',
-        trx.category || '',
-        trx.subcategory || '',
-        trx.confidence || ''
+      const rows = filteredTransactions.map(t => [
+        t.date || '', t.name || t.merchant || '', (t.amount || 0).toFixed(2),
+        t.account_name || t.account || '', t.category || '', t.subcategory || '', t.confidence || ''
       ]);
-      
-      const csv = [headers, ...rows].map(row => 
-        row.map(cell => `"${cell}"`).join(',')
-      ).join('\n');
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `categorized_transactions_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      downloadFile(csv, 'text/csv', `categorized_${new Date().toISOString().split('T')[0]}.csv`);
     }
 
     function exportToJSON() {
-      if (filteredTransactions.length === 0) {
-        alert('No transactions to export');
-        return;
-      }
-      
+      if (!filteredTransactions.length) return alert('No transactions to export');
       const json = JSON.stringify(filteredTransactions, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
+      downloadFile(json, 'application/json', `categorized_${new Date().toISOString().split('T')[0]}.json`);
+    }
+
+    function downloadFile(content, type, filename) {
+      const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `categorized_transactions_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
     }
-
   </script>
-</head>
-<body>
-  <div class="topbar">
-    <div class="inner">
-      <div class="brand">🏷️ Transaction Categorizer</div>
-      <div class="nav">
-        <a href="/">Finance Tip</a>
-        <a href="/categorize">Categorize</a>
-        <a href="/plaid-link">Plaid Link</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="wrap">
-    <div class="card llm-block">
-      <h2>🤖 LLM Provider (Optional)</h2>
-      <p>By default, this uses your local Ollama instance. Enable this option to use OpenAI's cloud models instead (requires API key).</p>
-      <div class="llm-toggle">
-        <input type="checkbox" id="useOpenAICheck" onchange="toggleOpenAI(this.checked)" />
-        <label for="useOpenAICheck">Use OpenAI Cloud Model</label>
-      </div>
-      <input id="openaiApiKey" class="llm-input" type="password" placeholder="OpenAI API Key (sk-...)" autocomplete="off" disabled />
-      <div class="llm-info">
-        ℹ️ Your API key is only used for this session and never stored on the server. Default model: gpt-4o-mini
-      </div>
-    </div>
-
-    <div class="card token-block" style="background:#f8fbff; border:1px solid #dbe5f6;">
-      <h2>🏦 Connect Your Bank</h2>
-      <p>Click the button below to securely connect your bank account via Plaid. Once connected, you can fetch fresh transactions automatically.</p>
-      <div class="token-actions">
-        <button class="btn" onclick="connectPlaidBank()">🔗 Connect Bank Account</button>
-      </div>
-      <div id="plaidStatus" class="status small"></div>
-    </div>
-
-    <div class="card upload-block">
-      <h2>📊 Upload CSV Transactions (Optional)</h2>
-      <p>Upload a CSV file with your transaction data. Your CSV should have columns for date, name/merchant, and amount.</p>
-      <div class="upload-actions">
-        <div class="file-input-wrapper">
-          <input type="file" id="csvFileInput" class="file-input" accept=".csv" onchange="handleFileUpload(event)" />
-          <label for="csvFileInput" class="file-label">Choose CSV File</label>
-        </div>
-        <span id="fileName" class="file-name"></span>
-        <button class="btn btn-secondary" onclick="clearUpload()" style="margin-left:auto;">Clear CSV</button>
-      </div>
-      <div id="uploadStatus" class="status small"></div>
-      <div class="sample-format">
-        <strong>Expected format:</strong> <code>date,name,amount</code> or <code>date,merchant,amount,account</code>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="header">
-        <h1>Categorize Your Transactions</h1>
-        <div class="controls">
-          <label class="toggle"><input id="fresh" type="checkbox" /> Fetch fresh data</label>
-          <input id="lookback" class="num" type="number" min="7" max="365" value="90" title="Lookback days" />
-          <button id="categorizeBtn" class="btn" onclick="categorizeTransactions(document.getElementById('fresh').checked)">Categorize</button>
-        </div>
-      </div>
-      <div id="status" class="status" aria-live="polite"></div>
-    </div>
-
-    <div id="results" style="display:none;">
-      <div class="card">
-        <h2 style="margin:0 0 16px 0;">Summary</h2>
-        <div id="summaryGrid" class="summary-grid"></div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-          <h2 style="margin:0;">Transactions</h2>
-          <div class="export-actions">
-            <button class="btn btn-secondary" onclick="exportToCSV()">Export CSV</button>
-            <button class="btn btn-secondary" onclick="exportToJSON()">Export JSON</button>
-          </div>
-        </div>
-        
-        <div class="filter-bar">
-          <label>Filter:</label>
-          <select id="categoryFilter" onchange="filterTransactions()">
-            <option value="">All Categories</option>
-          </select>
-          <input id="searchFilter" type="text" placeholder="Search transactions..." oninput="filterTransactions()" />
-        </div>
-        
-        <div id="resultCount" style="color:var(--muted); font-size:0.9rem; margin-bottom:10px;"></div>
-        
-        <div style="overflow-x:auto;">
-          <table class="transactions-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Merchant</th>
-                <th>Amount</th>
-                <th>Account</th>
-                <th>Category</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody id="transactionsBody">
-              <tr>
-                <td colspan="6" class="empty-state">
-                  <div class="empty-state-icon">🔍</div>
-                  <div>Click "Categorize" to analyze your transactions</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 </body>
 </html>
-

@@ -3,369 +3,947 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Personal Finance Tip</title>
+  <title>Finance Insights</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.plaid.com" />
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
-    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#2c3e50; --muted:#6c757d; }
-    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin:0; background:var(--bg); color:var(--text); }
-    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:14px 20px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
-    .topbar .inner { max-width: 900px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
-    .brand { font-weight:700; letter-spacing:.2px; }
-    .nav a { color:#e9f2ff; text-decoration:none; margin-left:16px; font-weight:600; }
-    .nav a:hover { text-decoration:underline; }
-    .wrap { max-width: 900px; margin: 26px auto; padding: 0 16px; }
-    .card { background:#fff; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,.08); padding:22px; }
-    .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
-    .header h1 { margin:0; font-size:1.4rem; }
-    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; }
-    .toggle { display:flex; align-items:center; gap:8px; background:#f5f7fb; border:1px solid #e6eaef; padding:8px 10px; border-radius:10px; }
-    .num { width:90px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:10px; }
-    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); }
-    .btn:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; }
-    .btn-secondary { background:#eef2f7; color:#0b5ed7; border:1px solid #d8e1ee; }
-    .status { margin-top:10px; display:none; color:var(--muted); }
-    .status.small { font-size:0.85rem; }
-    .spinner { width:32px; height:32px; border:3px solid #e9eef6; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; display:inline-block; vertical-align:middle; }
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-light: #818cf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Subtle gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    /* Navigation */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    /* Main content */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .icon {
+      width: 20px;
+      height: 20px;
+      background: var(--accent-glow);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    /* Action section */
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { background: #2a2a35; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+    }
+
+    .btn-ghost:hover { color: var(--text); }
+
+    /* Input styling */
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px 12px;
+    }
+
+    .input-group label {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .input-group input[type="number"] {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      width: 60px;
+      padding: 8px 0;
+      outline: none;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 11px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    .toggle-label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Status messages */
+    .status {
+      display: none;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      margin-top: 16px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status.visible { display: flex; }
+
+    .status.loading {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
-    .tip { margin-top:16px; display:none; }
-    .tip .title { font-weight:800; color:var(--brand); margin: 0 0 6px 0; }
-    .tip .advice { font-size:1.1rem; font-weight:700; margin:6px 0 6px 0; }
-    .tip .reason { color:var(--muted); margin: 4px 0 10px 0; }
-    .pill { display:inline-block; background:#e8f1ff; color:#0b5ed7; border:1px solid #cfe0ff; border-radius:999px; padding:6px 10px; font-weight:700; margin: 4px 0; }
-    .steps { margin-top:10px; }
-    .steps h3 { margin: 8px 0; font-size:1rem; }
-    .steps li { margin:6px 0; }
-    .insights { margin-top:12px; background:#f7f9fc; border:1px solid #e6eaef; border-radius:10px; padding:12px; color:#334155; }
-    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .grow { flex:1 1 auto; }
-    .token-block { margin-top:24px; background:#f8fbff; border:1px solid #dbe5f6; border-radius:14px; padding:18px; color:#334155; }
-    .token-block h2 { margin:0 0 6px 0; font-size:1.1rem; }
-    .token-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; }
-    .token-inputs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
-    .token-input { flex:1 1 240px; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; }
-    .token-actions { display:flex; gap:10px; flex-wrap:wrap; }
-    .upload-block { margin-top:24px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:14px; padding:18px; }
-    .upload-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#0369a1; }
-    .upload-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; }
-    .file-input-wrapper { position:relative; display:inline-block; }
-    .file-input { position:absolute; opacity:0; width:0; height:0; }
-    .file-label { display:inline-block; padding:10px 16px; background:#0ea5e9; color:#fff; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(14,165,233,.25); transition:all 0.2s; }
-    .file-label:hover { background:#0284c7; transform:translateY(-1px); }
-    .file-name { margin-left:12px; color:#334155; font-size:0.95rem; }
-    .upload-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-    .sample-format { margin-top:12px; padding:10px; background:#fefce8; border:1px solid #fde047; border-radius:8px; font-size:0.85rem; color:#854d0e; }
-    .sample-format code { background:#fef3c7; padding:2px 4px; border-radius:4px; }
-    .llm-block { margin-top:24px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:18px; }
-    .llm-block h2 { margin:0 0 6px 0; font-size:1.1rem; color:#166534; }
-    .llm-block p { margin:0 0 14px 0; color:#5b6c82; line-height:1.4; font-size:0.95rem; }
-    .llm-toggle { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-    .llm-toggle input[type="checkbox"] { width:20px; height:20px; cursor:pointer; }
-    .llm-toggle label { font-weight:600; color:#334155; cursor:pointer; }
-    .llm-input { width:100%; padding:9px 12px; border:1px solid #d3dce8; border-radius:10px; font-size:0.95rem; margin-bottom:10px; }
-    .llm-info { font-size:0.85rem; color:#64748b; margin-top:8px; }
+
+    /* Collapsible sections */
+    .collapsible {
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+
+    .collapsible-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 8px 0;
+    }
+
+    .collapsible-trigger:hover { color: var(--text); }
+
+    .collapsible-trigger .arrow {
+      transition: transform 0.2s;
+    }
+
+    .collapsible-trigger.open .arrow { transform: rotate(180deg); }
+
+    .collapsible-content {
+      display: none;
+      padding-top: 16px;
+    }
+
+    .collapsible-content.open { display: block; }
+
+    /* Data source tabs */
+    .source-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .source-tab {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .source-tab:hover { border-color: var(--text-dim); }
+
+    .source-tab.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .source-tab .tab-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .source-tab .tab-label { font-size: 0.85rem; color: var(--text-muted); }
+    .source-tab.active .tab-label { color: var(--text); }
+
+    /* File upload */
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-drop:hover, .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .file-drop-text { color: var(--text-muted); font-size: 0.9rem; }
+    .file-drop-text strong { color: var(--accent-light); }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg);
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+
+    .file-info.visible { display: flex; }
+    .file-info .file-name { flex: 1; font-size: 0.9rem; }
+    .file-info .file-status { color: var(--success); font-size: 0.85rem; }
+
+    /* Results section */
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    .tip-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a24 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tip-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-light), var(--success));
+    }
+
+    .tip-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .tip-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--accent-glow);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .tip-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0 0 4px;
+    }
+
+    .tip-savings {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .tip-advice {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    .steps-section h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin: 0 0 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .steps-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .steps-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .steps-list li:last-child { border-bottom: none; }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .step-text { font-size: 0.95rem; line-height: 1.5; }
+
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .insight-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .insight-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .insight-value {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    /* LLM Settings */
+    .settings-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .settings-row .field {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field input:disabled, .field select:disabled { opacity: 0.5; }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero h1 { font-size: 1.5rem; }
+      .action-row { flex-direction: column; }
+      .action-row .btn { width: 100%; justify-content: center; }
+      .source-tabs { flex-direction: column; }
+    }
   </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">
+        <div class="logo-icon">💰</div>
+        <span>FinanceAI</span>
+      </div>
+      <div class="nav-links">
+        <a href="/" class="active">Insights</a>
+        <a href="/categorize">Categorize</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <div class="hero">
+        <h1>Get Personalized Finance Tips</h1>
+        <p>AI-powered insights to help you save money and spend smarter</p>
+      </div>
+
+      <!-- Data Source Selection -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="icon">📊</div>
+            Choose Data Source
+          </div>
+        </div>
+
+        <div class="source-tabs">
+          <div class="source-tab active" onclick="selectSource('bank')" id="tabBank">
+            <div class="tab-icon">🏦</div>
+            <div class="tab-label">Connected Bank</div>
+          </div>
+          <div class="source-tab" onclick="selectSource('csv')" id="tabCSV">
+            <div class="tab-icon">📄</div>
+            <div class="tab-label">Upload CSV</div>
+          </div>
+        </div>
+
+        <!-- Bank source options -->
+        <div id="bankSource">
+          <div class="action-row">
+            <label class="toggle">
+              <input type="checkbox" id="fetchFresh" />
+              <span class="toggle-track"></span>
+              <span class="toggle-label">Fetch fresh data from bank</span>
+            </label>
+            <div class="input-group">
+              <label>Days:</label>
+              <input type="number" id="lookback" value="90" min="7" max="365" />
+            </div>
+          </div>
+        </div>
+
+        <!-- CSV source options -->
+        <div id="csvSource" style="display: none;">
+          <div class="file-drop" onclick="document.getElementById('csvInput').click()" id="fileDrop">
+            <div class="file-drop-icon">📁</div>
+            <div class="file-drop-text">
+              <strong>Click to upload</strong> or drag and drop<br>
+              CSV file with date, name, and amount columns
+            </div>
+          </div>
+          <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
+          <div class="file-info" id="fileInfo">
+            <span>📄</span>
+            <span class="file-name" id="fileName"></span>
+            <span class="file-status">✓ Ready</span>
+            <button class="btn-ghost" onclick="clearFile()">✕</button>
+          </div>
+        </div>
+
+        <!-- Advanced Settings -->
+        <div class="collapsible">
+          <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
+            <span>⚙️ AI Settings</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="collapsible-content">
+            <div style="margin-bottom: 16px;">
+              <label class="toggle">
+                <input type="checkbox" id="useOpenAI" onchange="toggleOpenAI(this.checked)" />
+                <span class="toggle-track"></span>
+                <span class="toggle-label">Use OpenAI (requires API key)</span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <div class="field">
+                <label>Model</label>
+                <select id="modelSelect" disabled>
+                  <option value="gpt5">gpt5</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>API Key</label>
+                <input type="password" id="openaiApiKey" placeholder="sk-..." disabled />
+              </div>
+            </div>
+            <p class="hint">By default, uses local Ollama. Enable OpenAI for cloud-based analysis.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <div class="card">
+        <div class="action-row">
+          <button class="btn btn-primary" id="generateBtn" onclick="generateTip()">
+            ✨ Generate Finance Tip
+          </button>
+          <button class="btn btn-secondary" id="copyBtn" onclick="copyTip()" disabled>
+            📋 Copy
+          </button>
+        </div>
+        <div class="status" id="status">
+          <div class="spinner"></div>
+          <span id="statusText">Analyzing your transactions...</span>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="results" id="results">
+        <div class="tip-card">
+          <div class="tip-header">
+            <div class="tip-icon">💡</div>
+            <div>
+              <h2 class="tip-title" id="tipTitle">Your Finance Tip</h2>
+              <span class="tip-savings" id="tipSavings"></span>
+            </div>
+          </div>
+          
+          <p class="tip-advice" id="tipAdvice"></p>
+
+          <div class="steps-section">
+            <h3>Action Steps</h3>
+            <ol class="steps-list" id="stepsList"></ol>
+          </div>
+
+          <div class="insights-grid" id="insightsGrid"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
   <script>
     let uploadedCSV = null;
     let useOpenAI = false;
-    let plaidLinkHandler = null;
-    let plaidLinkToken = null;
+    let selectedModel = 'gpt5';
+    let currentSource = 'bank';
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadModels();
+      setupDragDrop();
+    });
+
+    async function loadModels() {
+      try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '';
+        (data.models || []).forEach(model => {
+          const opt = document.createElement('option');
+          opt.value = model;
+          opt.textContent = model;
+          if (model === (data.default || 'gpt5')) {
+            opt.selected = true;
+            selectedModel = model;
+          }
+          select.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Failed to load models:', e);
+      }
+    }
+
+    function selectSource(source) {
+      currentSource = source;
+      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
+      document.getElementById('tabCSV').classList.toggle('active', source === 'csv');
+      document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
+      document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
+    }
+
+    function toggleCollapsible(trigger) {
+      trigger.classList.toggle('open');
+      trigger.nextElementSibling.classList.toggle('open');
+    }
 
     function toggleOpenAI(checked) {
       useOpenAI = checked;
-      const apiKeyInput = document.getElementById('openaiApiKey');
-      apiKeyInput.disabled = !checked;
-      if (!checked) {
-        apiKeyInput.value = '';
-      }
+      document.getElementById('openaiApiKey').disabled = !checked;
+      document.getElementById('modelSelect').disabled = !checked;
     }
 
-    async function connectPlaidBank() {
-      const plaidStatus = document.getElementById('plaidStatus');
-      plaidStatus.style.display = 'block';
-      plaidStatus.textContent = '🔄 Initializing Plaid Link...';
-
-      try {
-        // Get a link token from the backend
-        const resp = await fetch('/api/link-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: 'web_user' })
-        });
-        const data = await resp.json();
-        
-        if (!resp.ok || !data.link_token) {
-          throw new Error(data.error || 'Failed to generate link token.');
-        }
-        
-        plaidLinkToken = data.link_token;
-        
-        // Launch Plaid Link
-        if (!window.Plaid || typeof window.Plaid.create !== 'function') {
-          throw new Error('Plaid loader failed to initialize. Check your network connection.');
-        }
-
-        if (plaidLinkHandler && typeof plaidLinkHandler.destroy === 'function') {
-          plaidLinkHandler.destroy();
-        }
-
-        plaidLinkHandler = window.Plaid.create({
-          token: plaidLinkToken,
-          onSuccess: async (publicToken, metadata) => {
-            plaidStatus.textContent = '🔄 Saving bank connection...';
-            
-            try {
-              const payload = { public_token: publicToken };
-              if (metadata && metadata.item_id) {
-                payload.item_id = metadata.item_id;
-              }
-
-              const exchangeResp = await fetch('/api/plaid-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              const exchangeData = await exchangeResp.json();
-
-              if (!exchangeResp.ok || !exchangeData.success) {
-                throw new Error(exchangeData.error || 'Failed to save connection.');
-              }
-
-              const institution = metadata && metadata.institution ? metadata.institution.name : 'your bank';
-              plaidStatus.textContent = `✅ Successfully connected to ${institution}! You can now use "Fetch fresh data".`;
-              plaidStatus.style.color = '#059669';
-            } catch (err) {
-              plaidStatus.textContent = `❌ ${err.message}`;
-              plaidStatus.style.color = '#dc2626';
-            }
-          },
-          onExit: (err) => {
-            if (err) {
-              plaidStatus.textContent = `❌ Connection cancelled: ${err.error_message || 'Unknown error'}`;
-              plaidStatus.style.color = '#dc2626';
-            } else {
-              plaidStatus.textContent = 'Connection cancelled.';
-              plaidStatus.style.color = '#6c757d';
-            }
-          }
-        });
-
-        plaidLinkHandler.open();
-        plaidStatus.textContent = 'Opening Plaid Link...';
-      } catch (err) {
-        plaidStatus.textContent = `❌ ${err.message}`;
-        plaidStatus.style.color = '#dc2626';
-      }
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(e => {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(e => {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('dragover'); });
+      });
+      drop.addEventListener('drop', ev => {
+        const file = ev.dataTransfer.files[0];
+        if (file) processFile(file);
+      });
     }
 
-    function handleFileUpload(event) {
+    function handleFileSelect(event) {
       const file = event.target.files[0];
-      const fileNameDisplay = document.getElementById('fileName');
-      const uploadStatus = document.getElementById('uploadStatus');
-      const genBtn = document.getElementById('genBtn');
-      
-      if (!file) {
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
-        uploadStatus.style.display = 'none';
-        return;
-      }
-      
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
       if (!file.name.toLowerCase().endsWith('.csv')) {
-        uploadStatus.style.display = 'block';
-        uploadStatus.textContent = '❌ Please upload a CSV file';
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
+        showStatus('error', 'Please upload a CSV file');
         return;
       }
-      
-      fileNameDisplay.textContent = `📄 ${file.name}`;
-      uploadStatus.style.display = 'block';
-      uploadStatus.textContent = '🔄 Reading CSV file...';
-      
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = e => {
         uploadedCSV = e.target.result;
-        uploadStatus.textContent = '✅ CSV loaded successfully';
-        uploadStatus.style.color = '#059669';
-        genBtn.textContent = 'Generate Tip from CSV';
-      };
-      reader.onerror = function() {
-        uploadStatus.textContent = '❌ Failed to read file';
-        uploadedCSV = null;
-        fileNameDisplay.textContent = '';
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('visible');
+        document.getElementById('fileDrop').style.display = 'none';
       };
       reader.readAsText(file);
     }
 
-    function clearUpload() {
+    function clearFile() {
       uploadedCSV = null;
-      document.getElementById('csvFileInput').value = '';
-      document.getElementById('fileName').textContent = '';
-      document.getElementById('uploadStatus').style.display = 'none';
-      document.getElementById('genBtn').textContent = 'Generate Tip';
+      document.getElementById('csvInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('fileDrop').style.display = 'block';
     }
 
-    async function generateTip(fetchFresh) {
+    function showStatus(type, message) {
       const status = document.getElementById('status');
-      const tipWrap = document.getElementById('tip');
-      const btn = document.getElementById('genBtn');
-      const copyBtn = document.getElementById('copyBtn');
-      const lookback = document.getElementById('lookback').value || 90;
-      const openaiApiKey = document.getElementById('openaiApiKey').value.trim();
+      const text = document.getElementById('statusText');
+      status.className = 'status visible ' + type;
+      text.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+    }
 
-      tipWrap.style.display = 'none';
-      status.style.display = 'block';
-      status.innerHTML = '<span class="spinner"></span>Generating your personalized tip...';
-      btn.disabled = true; copyBtn.disabled = true;
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    async function generateTip() {
+      const btn = document.getElementById('generateBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const results = document.getElementById('results');
+      
+      btn.disabled = true;
+      copyBtn.disabled = true;
+      results.classList.remove('visible');
+      showStatus('loading', 'Analyzing your transactions...');
 
       try {
         const payload = {
-          fetch_fresh: !!fetchFresh,
-          lookback_days: parseInt(lookback, 10),
+          fetch_fresh: document.getElementById('fetchFresh').checked,
+          lookback_days: parseInt(document.getElementById('lookback').value) || 90,
           use_openai: useOpenAI,
-          openai_api_key: openaiApiKey
+          openai_api_key: document.getElementById('openaiApiKey').value.trim(),
+          model: useOpenAI ? selectedModel : ''
         };
-        
-        // If CSV is uploaded, use that instead
-        if (uploadedCSV) {
+
+        if (currentSource === 'csv' && uploadedCSV) {
           payload.use_csv = true;
           payload.csv_data = uploadedCSV;
           payload.fetch_fresh = false;
         }
 
         const resp = await fetch('/api/finance-tip', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+
         const data = await resp.json();
         if (!data.success) throw new Error(data.error || 'Failed to generate tip');
-        const tip = (data.tip_analysis && data.tip_analysis.tip) || {};
-        const insights = (data.tip_analysis && data.tip_analysis.spending_insights) || {};
 
-        // Fill UI
-        document.getElementById('tipTitle').textContent = tip.title || 'Personal Finance Tip';
-        document.getElementById('tipAdvice').textContent = tip.advice || 'No advice available.';
-        document.getElementById('tipReason').textContent = tip.reasoning || '';
+        const tip = data.tip_analysis?.tip || {};
+        const insights = data.tip_analysis?.spending_insights || {};
+
+        // Populate results
+        document.getElementById('tipTitle').textContent = tip.title || 'Your Finance Tip';
         document.getElementById('tipSavings').textContent = tip.potential_savings ? `💰 ${tip.potential_savings}` : '';
-        document.getElementById('tipCategory').textContent = tip.category ? `#${tip.category}` : '';
-        document.getElementById('tipConfidence').textContent = tip.confidence != null ? `Confidence: ${tip.confidence}%` : '';
-        const steps = Array.isArray(tip.actionable_steps) ? tip.actionable_steps : [];
-        document.getElementById('stepsList').innerHTML = steps.map(s => `<li>${s}</li>`).join('') || '<li>No steps provided.</li>';
-        document.getElementById('insights').innerHTML = `
-          ${insights.top_spending_category ? `<div>Top category: <strong>${insights.top_spending_category}</strong></div>` : ''}
-          ${insights.frequent_merchants && insights.frequent_merchants.length ? `<div>Frequent merchants: ${insights.frequent_merchants.slice(0,3).join(', ')}</div>` : ''}
-          ${insights.spending_trend ? `<div>Spending trend: ${insights.spending_trend}</div>` : ''}
-        `;
+        document.getElementById('tipSavings').style.display = tip.potential_savings ? 'inline-block' : 'none';
+        document.getElementById('tipAdvice').textContent = tip.advice || 'No advice available.';
 
-        tipWrap.style.display = 'block';
-        status.style.display = 'none';
-        btn.disabled = false; copyBtn.disabled = false;
+        const steps = Array.isArray(tip.actionable_steps) ? tip.actionable_steps : [];
+        document.getElementById('stepsList').innerHTML = steps.map((s, i) => `
+          <li>
+            <span class="step-number">${i + 1}</span>
+            <span class="step-text">${s}</span>
+          </li>
+        `).join('') || '<li><span class="step-text">No steps provided.</span></li>';
+
+        let insightsHtml = '';
+        if (insights.top_spending_category) {
+          insightsHtml += `<div class="insight-card"><div class="insight-label">Top Category</div><div class="insight-value">${insights.top_spending_category}</div></div>`;
+        }
+        if (insights.frequent_merchants?.length) {
+          insightsHtml += `<div class="insight-card"><div class="insight-label">Frequent Merchants</div><div class="insight-value">${insights.frequent_merchants.slice(0,3).join(', ')}</div></div>`;
+        }
+        if (insights.spending_trend) {
+          insightsHtml += `<div class="insight-card"><div class="insight-label">Trend</div><div class="insight-value">${insights.spending_trend}</div></div>`;
+        }
+        document.getElementById('insightsGrid').innerHTML = insightsHtml;
+
+        hideStatus();
+        results.classList.add('visible');
+        btn.disabled = false;
+        copyBtn.disabled = false;
       } catch (e) {
-        status.innerHTML = `❌ ${e.message}`;
-        btn.disabled = false; copyBtn.disabled = true;
+        showStatus('error', e.message);
+        btn.disabled = false;
       }
     }
 
     function copyTip() {
       const title = document.getElementById('tipTitle').textContent;
       const advice = document.getElementById('tipAdvice').textContent;
-      const reason = document.getElementById('tipReason').textContent;
       const savings = document.getElementById('tipSavings').textContent;
-      const steps = Array.from(document.querySelectorAll('#stepsList li')).map(li => `- ${li.textContent}`).join('\n');
-      const text = `${title}\n\n${advice}\n${reason ? '\n' + reason : ''}\n${savings ? '\n' + savings : ''}\n\nSteps:\n${steps}`;
+      const steps = Array.from(document.querySelectorAll('#stepsList .step-text')).map((el, i) => `${i+1}. ${el.textContent}`).join('\n');
+      const text = `${title}\n\n${advice}\n${savings ? '\n' + savings : ''}\n\nAction Steps:\n${steps}`;
       navigator.clipboard.writeText(text).then(() => {
-        const status = document.getElementById('status');
-        status.style.display = 'block';
-        status.textContent = '✅ Copied to clipboard';
-        setTimeout(() => status.style.display = 'none', 1500);
+        showStatus('success', 'Copied to clipboard!');
+        setTimeout(hideStatus, 2000);
       });
     }
-
   </script>
-  </head>
-<body>
-  <div class="topbar">
-    <div class="inner">
-      <div class="brand">💡 Personal Finance Tip Generator</div>
-      <div class="nav">
-        <a href="/">Finance Tip</a>
-        <a href="/categorize">Categorize</a>
-        <a href="/plaid-link">Plaid Link</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="wrap">
-    <div class="card">
-      <div class="header">
-        <h1>Get a Personalized Finance Tip</h1>
-        <div class="row">
-          <label class="toggle"><input id="fresh" type="checkbox" /> Fetch fresh data</label>
-          <input id="lookback" class="num" type="number" min="7" max="365" value="90" title="Lookback days" />
-          <button id="genBtn" class="btn" onclick="generateTip(document.getElementById('fresh').checked)">Generate Tip</button>
-          <button id="copyBtn" class="btn btn-secondary" onclick="copyTip()" disabled>Copy</button>
-        </div>
-      </div>
-      <div id="status" class="status" aria-live="polite"></div>
-
-      <div id="tip" class="tip" aria-live="polite">
-        <div class="row">
-          <div class="grow">
-            <div id="tipCategory" class="pill"></div>
-            <h2 id="tipTitle" class="title">Personal Finance Tip</h2>
-            <div id="tipAdvice" class="advice"></div>
-            <div id="tipReason" class="reason"></div>
-            <div id="tipSavings" class="pill"></div>
-            <div id="tipConfidence" class="muted" style="margin-top:6px;color:#64748b;"></div>
-          </div>
-        </div>
-        <div class="steps">
-          <h3>Action Steps</h3>
-          <ol id="stepsList"></ol>
-        </div>
-        <div id="insights" class="insights"></div>
-      </div>
-
-      <div class="token-block" aria-live="polite">
-        <h2>Connect Your Bank</h2>
-        <p>Click the button below to securely connect your bank account via Plaid. Once connected, you can fetch fresh transactions automatically.</p>
-        <div class="token-actions">
-          <button class="btn" onclick="connectPlaidBank()">🔗 Connect Bank Account</button>
-        </div>
-        <div id="plaidStatus" class="status small"></div>
-      </div>
-
-      <div class="upload-block">
-        <h2>📊 Or Upload Your Own CSV</h2>
-        <p>Don't use Plaid? Upload a CSV file with your transactions. Your data stays private and is only processed locally.</p>
-        <div class="upload-actions">
-          <div class="file-input-wrapper">
-            <input type="file" id="csvFileInput" class="file-input" accept=".csv" onchange="handleFileUpload(event)" />
-            <label for="csvFileInput" class="file-label">Choose CSV File</label>
-          </div>
-          <span id="fileName" class="file-name"></span>
-          <button class="btn btn-secondary" onclick="clearUpload()" style="margin-left:auto;">Clear CSV</button>
-        </div>
-        <div id="uploadStatus" class="status small"></div>
-        <div class="sample-format">
-          <strong>Expected CSV format:</strong> Your CSV should have columns for <code>date</code>, <code>name</code> (or merchant/description), and <code>amount</code>. Optional: <code>account</code>.<br>
-          Example: <code>date,name,amount</code> or <code>date,merchant,amount,account</code>
-        </div>
-      <div class="llm-block">
-        <h2>🤖 LLM Provider (Optional)</h2>
-        <p>By default, this uses your local Ollama instance. Enable this option to use OpenAI's cloud models instead (requires API key).</p>
-        <div class="llm-toggle">
-          <input type="checkbox" id="useOpenAICheck" onchange="toggleOpenAI(this.checked)" />
-          <label for="useOpenAICheck">Use OpenAI Cloud Model</label>
-        </div>
-        <input id="openaiApiKey" class="llm-input" type="password" placeholder="OpenAI API Key (sk-...)" autocomplete="off" disabled />
-        <div class="llm-info">
-          ℹ️ Your API key is only used for this session and never stored on the server. Default model: gpt-4o-mini
-        </div>
-      </div>
-    </div>
-
-  </div>
 </body>
 </html>

@@ -3,128 +3,444 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plaid Link Helper</title>
+  <title>Connect Bank Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.plaid.com" />
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
-    :root { --brand:#0d6efd; --brand-dark:#0b5ed7; --bg:#f6f8fb; --text:#1f2937; --muted:#6b7280; }
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
-    .topbar { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); color:#fff; padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
-    .topbar .inner { max-width: 920px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
-    .brand { margin:0; font-size:1.2rem; font-weight:700; }
-    .nav a { color:#e9f2ff; text-decoration:none; margin-left:16px; font-weight:600; }
-    .nav a:hover { text-decoration:underline; }
-    .wrap { max-width:920px; margin:26px auto; padding:0 16px; }
-    .card { background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(15,23,42,.08); padding:24px; margin-bottom:22px; }
-    h1 { margin-top:0; }
-    h2 { margin-bottom:8px; font-size:1.1rem; }
-    .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
-    .input { flex:1 1 240px; padding:10px 12px; border:1px solid #d1d9e6; border-radius:9px; font-size:0.95rem; }
-    .btn { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%); border:none; color:#fff; padding:10px 18px; border-radius:10px; font-weight:600; cursor:pointer; box-shadow:0 2px 6px rgba(13,110,253,.25); transition:opacity .15s ease; }
-    .btn:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
-    .btn.secondary { background:#eff2f8; color:var(--brand-dark); border:1px solid #ced8ed; }
-    .status { margin-top:10px; font-size:0.9rem; color:var(--muted); }
-    .status.strong { color:#1e293b; font-weight:600; }
-    .outputs { margin-top:16px; display:grid; gap:14px; }
-    textarea { width:100%; min-height:80px; resize:vertical; padding:10px 12px; border:1px solid #d1d9e6; border-radius:10px; font-family:Menlo,Consolas,monospace; font-size:0.95rem; }
-    code { background:#eef2ff; padding:3px 6px; border-radius:6px; }
-    .muted { color:var(--muted); font-size:0.9rem; }
-    .stack { display:flex; flex-direction:column; gap:8px; }
-    label { font-weight:600; font-size:0.9rem; color:#1f2937; }
-    .divider { margin:18px 0; border:none; border-top:1px dashed #d6deec; }
-    .bad { color:#b91c1c; }
-    .good { color:#0f766e; }
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-light: #818cf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 60px 0 40px;
+    }
+
+    .hero-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, var(--accent-glow) 0%, transparent 100%);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin: 0 auto 24px;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 12px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .connect-card {
+      text-align: center;
+      padding: 40px 24px;
+    }
+
+    .btn {
+      padding: 14px 32px;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-icon { font-size: 1.2rem; }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .status.visible { display: block; }
+
+    .status.loading {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    .status.info {
+      background: var(--accent-glow);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      color: var(--accent-light);
+    }
+
+    .features {
+      display: grid;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .feature-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent-glow);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .feature-content h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0 0 4px;
+      color: var(--text);
+    }
+
+    .feature-content p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .security-note {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      border-radius: 10px;
+      margin-top: 24px;
+    }
+
+    .security-note span:first-child { font-size: 1.2rem; }
+
+    .security-note p {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--success);
+    }
+
+    .sandbox-hint {
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: var(--warning);
+    }
+
+    .sandbox-hint code {
+      background: rgba(245, 158, 11, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero { padding: 40px 0 32px; }
+      .hero h1 { font-size: 1.5rem; }
+      .connect-card { padding: 32px 20px; }
+    }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="inner">
-      <p class="brand">Plaid Link Helper</p>
-      <div class="nav">
-        <a href="/">Finance Tip</a>
+  <div class="app">
+    <nav>
+      <div class="logo">
+        <div class="logo-icon">💰</div>
+        <span>FinanceAI</span>
+      </div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
         <a href="/categorize">Categorize</a>
-        <a href="/plaid-link">Plaid Link</a>
+        <a href="/plaid-link" class="active">Connect Bank</a>
       </div>
-    </div>
-  </div>
-  <div class="wrap">
-    <div class="card">
-      <h1>Connect Your Bank Account</h1>
-      <p>Click "Open Plaid Link" below to securely connect your bank account. The connection process is automatic and your <code>access_token</code> will be saved for future use.</p>
-      <div id="linkStatus" class="status" style="margin-top: 12px;"></div>
-    </div>
+    </nav>
 
-    <div class="card">
-      <h2>Step 1 — Launch Plaid Link</h2>
-      <div class="stack">
-        <div class="row">
-          <button class="btn" onclick="launchPlaidLink()">Open Plaid Link</button>
-        </div>
-        <p class="muted">Use your Plaid sandbox credentials (for example <code>user_good</code> / <code>pass_good</code>) or real credentials in production. Your connection will be saved automatically.</p>
-        <div id="launchStatus" class="status"></div>
-        <div id="exchangeStatus" class="status"></div>
+    <main>
+      <div class="hero">
+        <div class="hero-icon">🏦</div>
+        <h1>Connect Your Bank</h1>
+        <p>Securely link your bank account to automatically import transactions and get personalized insights.</p>
       </div>
-    </div>
+
+      <div class="card connect-card">
+        <button class="btn btn-primary" id="connectBtn" onclick="launchPlaidLink()">
+          <span class="btn-icon">🔗</span>
+          Connect Bank Account
+        </button>
+
+        <div class="status" id="initStatus"></div>
+        <div class="status" id="linkStatus"></div>
+
+        <div class="sandbox-hint">
+          <strong>Testing?</strong> Use sandbox credentials: <code>user_good</code> / <code>pass_good</code>
+        </div>
+      </div>
+
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🔒</div>
+          <div class="feature-content">
+            <h3>Bank-Level Security</h3>
+            <p>Your credentials are encrypted and never stored on our servers. We use Plaid, trusted by millions.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-content">
+            <h3>Instant Import</h3>
+            <p>Once connected, your transactions are available immediately for analysis and categorization.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔄</div>
+          <div class="feature-content">
+            <h3>Always Fresh Data</h3>
+            <p>Get up to 90 days of transaction history with one click. No manual exports needed.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="security-note">
+        <span>🛡️</span>
+        <p>Your data is processed locally and never shared. All analysis happens on your machine.</p>
+      </div>
+    </main>
   </div>
 
   <script>
     let linkHandler = null;
-    let linkToken = null; // Store link token in memory
+    let linkToken = null;
+
+    document.addEventListener('DOMContentLoaded', requestLinkToken);
 
     async function requestLinkToken() {
-      const status = document.getElementById('linkStatus');
-      const userId = 'web_user';
-      status.textContent = 'Initializing connection...';
+      const status = document.getElementById('initStatus');
+      status.className = 'status visible loading';
+      status.textContent = 'Initializing secure connection...';
 
       try {
         const resp = await fetch('/api/link-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId })
+          body: JSON.stringify({ user_id: 'web_user' })
         });
         const data = await resp.json();
+
         if (!resp.ok || !data.link_token) {
-          throw new Error(data.error || 'Failed to generate link token.');
+          throw new Error(data.error || 'Failed to initialize');
         }
+
         linkToken = data.link_token;
-        status.textContent = `✅ Ready to connect your bank.`;
-        status.classList.add('good');
+        status.className = 'status visible info';
+        status.textContent = '✓ Ready to connect your bank';
       } catch (err) {
-        status.textContent = `❌ ${err.message}`;
-        status.classList.add('bad');
+        status.className = 'status visible error';
+        status.textContent = `⚠️ ${err.message}`;
       }
     }
 
-    // Automatically generate link token on page load
-    window.addEventListener('DOMContentLoaded', () => {
-      requestLinkToken();
-    });
-
     function launchPlaidLink() {
-      const launchStatus = document.getElementById('launchStatus');
+      const linkStatus = document.getElementById('linkStatus');
 
       if (!linkToken) {
-        launchStatus.textContent = 'Please wait for initialization to complete.';
-        return;
-      }
-      if (!window.Plaid || typeof window.Plaid.create !== 'function') {
-        launchStatus.textContent = 'Plaid loader failed to initialize. Check your network connection.';
+        linkStatus.className = 'status visible error';
+        linkStatus.textContent = 'Please wait for initialization...';
         return;
       }
 
-      launchStatus.textContent = 'Opening Plaid Link...';
+      if (!window.Plaid || typeof window.Plaid.create !== 'function') {
+        linkStatus.className = 'status visible error';
+        linkStatus.textContent = 'Plaid failed to load. Check your connection.';
+        return;
+      }
+
+      linkStatus.className = 'status visible loading';
+      linkStatus.textContent = 'Opening Plaid Link...';
+
       if (linkHandler && typeof linkHandler.destroy === 'function') {
         linkHandler.destroy();
       }
 
       linkHandler = window.Plaid.create({
         token: linkToken,
-        onSuccess: (publicToken, metadata) => handlePlaidSuccess(publicToken, metadata),
+        onSuccess: handleSuccess,
         onExit: (err) => {
           if (err) {
-            launchStatus.textContent = `Plaid Link exited with ${err.error_code || err.error_message || 'an error'}.`;
+            linkStatus.className = 'status visible error';
+            linkStatus.textContent = `Connection cancelled: ${err.error_message || 'Unknown error'}`;
           } else {
-            launchStatus.textContent = 'Plaid Link closed.';
+            linkStatus.className = 'status visible';
+            linkStatus.style.display = 'none';
           }
         }
       });
@@ -132,48 +448,41 @@
       try {
         linkHandler.open();
       } catch (err) {
-        launchStatus.textContent = `Unable to open Plaid Link: ${err.message}`;
+        linkStatus.className = 'status visible error';
+        linkStatus.textContent = `Unable to open: ${err.message}`;
       }
     }
 
-    function handlePlaidSuccess(publicToken, metadata) {
-      const launchStatus = document.getElementById('launchStatus');
-      const exchangeStatus = document.getElementById('exchangeStatus');
+    async function handleSuccess(publicToken, metadata) {
+      const linkStatus = document.getElementById('linkStatus');
+      const institution = metadata?.institution?.name || 'your bank';
 
-      const institution = metadata && metadata.institution ? metadata.institution.name : 'Unknown institution';
-      const itemId = metadata && metadata.item_id ? metadata.item_id : 'Not provided';
-      launchStatus.textContent = `✅ Connected to ${institution}`;
-
-      // Automatically exchange the public token
-      exchangePublicToken(publicToken, metadata && metadata.item_id);
-    }
-
-    async function exchangePublicToken(publicToken, itemId) {
-      const exchangeStatus = document.getElementById('exchangeStatus');
-      exchangeStatus.textContent = '🔄 Saving connection...';
+      linkStatus.className = 'status visible loading';
+      linkStatus.textContent = `Connecting to ${institution}...`;
 
       try {
         const payload = { public_token: publicToken };
-        if (itemId) {
-          payload.item_id = itemId;
-        }
+        if (metadata?.item_id) payload.item_id = metadata.item_id;
 
         const resp = await fetch('/api/plaid-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const data = await resp.json();
 
+        const data = await resp.json();
         if (!resp.ok || !data.success) {
-          throw new Error(data.error || 'Exchange failed.');
+          throw new Error(data.error || 'Connection failed');
         }
 
-        exchangeStatus.textContent = `✅ Bank connected successfully! You can now use "Fetch fresh data" on the Finance Tip or Categorize pages.`;
-        exchangeStatus.classList.add('good');
+        linkStatus.className = 'status visible success';
+        linkStatus.innerHTML = `
+          <strong>✓ Successfully connected to ${institution}!</strong><br>
+          <span style="font-size: 0.85rem; opacity: 0.9;">You can now use "Fetch fresh data" on the Insights or Categorize pages.</span>
+        `;
       } catch (err) {
-        exchangeStatus.textContent = `❌ ${err.message}`;
-        exchangeStatus.classList.add('bad');
+        linkStatus.className = 'status visible error';
+        linkStatus.textContent = `⚠️ ${err.message}`;
       }
     }
   </script>
