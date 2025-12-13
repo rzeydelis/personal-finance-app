@@ -157,6 +157,7 @@ cython_debug/
 transactions_*.txt
 *.csv
 *.xlsx
+data/plaid_access_tokens.json
 
 # API keys and sensitive configuration
 .env

@@ -796,8 +796,7 @@
   <div class="app">
     <nav>
       <div class="logo">
-        <div class="logo-icon">💰</div>
-        <span>FinanceAI</span>
+        <span>Pluto Finance</span>
       </div>
       <div class="nav-links">
         <a href="/">Insights</a>
@@ -865,7 +864,7 @@
 
         <div class="collapsible">
           <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
-            <span>⚙️ AI Settings</span>
+            <span>AI Settings</span>
             <span class="arrow">▼</span>
           </div>
           <div class="collapsible-content">
@@ -1324,7 +1323,7 @@
         const resp = await fetch('/api/email-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name, source: 'categorize' })
+          body: JSON.stringify({ email, name })
         });
         
         const data = await resp.json();

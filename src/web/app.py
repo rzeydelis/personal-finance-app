@@ -1,13 +1,15 @@
-import csv
 import json
 import logging
 import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from io import StringIO
+
 
 from flask import Flask, jsonify, render_template, request
+
+from finance_tip import generate_finance_tip
+from utils import parse_csv_transactions
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
@@ -40,55 +42,18 @@ exchange_public_token = None
 PlaidAccessTokenError = RuntimeError  # type: ignore
 PlaidConfigurationError = RuntimeError  # type: ignore
 BankDataPipeline = None  # type: ignore
+from src.api.get_bank_trx import (
+    PlaidAccessTokenError,
+    PlaidConfigurationError,
+    create_plaid_client,
+    exchange_public_token,
+    fetch_and_save_transactions,
+    store_access_token,
+)
 
-try:
-    from src.api.get_bank_trx import (
-        PlaidAccessTokenError,
-        PlaidConfigurationError,
-        create_plaid_client,
-        exchange_public_token,
-        fetch_and_save_transactions,
-        store_access_token,
-    )
-except Exception:
-    try:
-        from ..api.get_bank_trx import (  # type: ignore
-            PlaidAccessTokenError,
-            PlaidConfigurationError,
-            create_plaid_client,
-            exchange_public_token,
-            fetch_and_save_transactions,
-            store_access_token,
-        )
-    except Exception:
-        try:
-            from api.get_bank_trx import (  # type: ignore
-                PlaidAccessTokenError,
-                PlaidConfigurationError,
-                create_plaid_client,
-                exchange_public_token,
-                fetch_and_save_transactions,
-                store_access_token,
-            )
-        except Exception:
-            pass
+from src.api.bank_data_pipeline import BankDataPipeline
 
-try:
-    from src.api.bank_data_pipeline import BankDataPipeline  # type: ignore
-    logging.info("Successfully imported BankDataPipeline from src.api.bank_data_pipeline")
-except Exception as e:
-    logging.warning(f"Failed to import from src.api.bank_data_pipeline: {e}")
-    try:
-        from ..api.bank_data_pipeline import BankDataPipeline  # type: ignore
-        logging.info("Successfully imported BankDataPipeline from ..api.bank_data_pipeline")
-    except Exception as e2:
-        logging.warning(f"Failed to import from ..api.bank_data_pipeline: {e2}")
-        try:
-            from api.bank_data_pipeline import BankDataPipeline  # type: ignore
-            logging.info("Successfully imported BankDataPipeline from api.bank_data_pipeline")
-        except Exception as e3:
-            logging.warning(f"Failed to import from api.bank_data_pipeline: {e3}")
-            BankDataPipeline = None  # type: ignore
+
 
 _bank_pipeline = None
 
@@ -181,223 +146,8 @@ def parse_transaction_file(file_path):
         return {'success': False, 'transactions': [], 'count': 0, 'error': str(e)}
 
 
-def parse_csv_transactions(csv_content):
-    """Parse CSV content into structured transaction data
-    
-    Expected CSV formats (case-insensitive headers):
-    - date, name/merchant/description, amount [, account]
-    - date, time, name, description, amount [, account]
-    
-    Date formats supported: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, etc.
-    Amount formats: with or without $ sign, negative or positive
-    """
-    transactions = []
-    try:
-        # Use StringIO to read CSV content
-        csv_file = StringIO(csv_content)
-        reader = csv.DictReader(csv_file)
-        
-        if not reader.fieldnames:
-            return {'success': False, 'transactions': [], 'count': 0, 'error': 'CSV file is empty or has no headers'}
-        
-        # Normalize header names (lowercase, strip whitespace)
-        headers = {h.lower().strip(): h for h in reader.fieldnames if h}
-        
-        # Find required columns (case-insensitive)
-        date_col = None
-        name_col = None
-        amount_col = None
-        account_col = None
-        time_col = None
-        
-        for col in headers.keys():
-            if 'date' in col:
-                date_col = headers[col]
-            elif any(term in col for term in ['name', 'merchant', 'description', 'vendor']):
-                if not name_col:  # Use first match
-                    name_col = headers[col]
-            elif 'amount' in col or 'total' in col:
-                amount_col = headers[col]
-            elif 'account' in col:
-                account_col = headers[col]
-            elif 'time' in col:
-                time_col = headers[col]
-        
-        if not date_col or not amount_col:
-            return {
-                'success': False, 
-                'transactions': [], 
-                'count': 0, 
-                'error': 'CSV must have "date" and "amount" columns'
-            }
-        
-        if not name_col:
-            # Try to find any text column for name
-            for col in headers.keys():
-                if col not in ['date', 'amount', 'account', 'time']:
-                    name_col = headers[col]
-                    break
-        
-        if not name_col:
-            return {
-                'success': False, 
-                'transactions': [], 
-                'count': 0, 
-                'error': 'CSV must have a column for transaction name/merchant/description'
-            }
-        
-        # Parse each row
-        for i, row in enumerate(reader, 1):
-            try:
-                date_str = row.get(date_col, '').strip()
-                name = row.get(name_col, '').strip() or 'Unknown'
-                amount_str = row.get(amount_col, '').strip()
-                account_name = row.get(account_col, '').strip() if account_col else None
-                time_str = row.get(time_col, '').strip() if time_col else '12:00:00'
-                
-                if not date_str or not amount_str:
-                    continue
-                
-                # Parse date - try multiple formats
-                date_obj = None
-                date_formats = [
-                    '%Y-%m-%d',
-                    '%m/%d/%Y',
-                    '%d/%m/%Y',
-                    '%Y/%m/%d',
-                    '%m-%d-%Y',
-                    '%d-%m-%Y',
-                    '%b %d, %Y',
-                    '%B %d, %Y',
-                    '%d %b %Y',
-                    '%d %B %Y',
-                ]
-                
-                for fmt in date_formats:
-                    try:
-                        date_obj = datetime.strptime(date_str, fmt)
-                        break
-                    except ValueError:
-                        continue
-                
-                if not date_obj:
-                    logging.warning(f"Could not parse date '{date_str}' in row {i}")
-                    continue
-                
-                # Parse amount - remove $ and commas, handle negative
-                amount_str = amount_str.replace('$', '').replace(',', '').strip()
-                
-                # Handle parentheses for negative amounts (accounting format)
-                if amount_str.startswith('(') and amount_str.endswith(')'):
-                    amount_str = '-' + amount_str[1:-1]
-                
-                try:
-                    amount = float(amount_str)
-                except ValueError:
-                    logging.warning(f"Could not parse amount '{amount_str}' in row {i}")
-                    continue
-                
-                transactions.append({
-                    'id': len(transactions) + 1,
-                    'date': date_obj.strftime('%Y-%m-%d'),
-                    'datetime': date_obj,
-                    'name': name,
-                    'merchant': name,
-                    'description': name,
-                    'amount': amount,
-                    'account_name': account_name,
-                    'time': time_str
-                })
-            except Exception as e:
-                logging.warning(f"Error parsing row {i}: {e}")
-                continue
-        
-        if not transactions:
-            return {
-                'success': False,
-                'transactions': [],
-                'count': 0,
-                'error': 'No valid transactions found in CSV. Check date and amount formats.'
-            }
-        
-        return {'success': True, 'transactions': transactions, 'count': len(transactions), 'error': None}
-    except Exception as e:
-        logging.exception("Error parsing CSV")
-        return {'success': False, 'transactions': [], 'count': 0, 'error': f'CSV parsing error: {str(e)}'}
 
-def generate_finance_tip(transactions, openai_api_key=None, use_openai=False, model=None):
-    """Generate personalized finance tip using LLM"""
-    if not llm_generate_json:
-        return {'success': False, 'analysis': {}, 'error': 'LLM not available'}
-    
-    # Limit transactions to prevent timeout
-    max_transactions = 200
-    if len(transactions) > max_transactions:
-        transactions = transactions[:max_transactions]
-    
-    csv_data = "date,time,name,description,amount,account\n"
-    for trx in transactions:
-        csv_data += f"{trx['date']},{trx.get('time','')},{trx.get('merchant','')},{trx.get('description','')},{trx.get('amount',0)},{trx.get('account','Unknown')}\n"
-    # print(f"CSV data: {csv_data}")
 
-    prompt = f"""You are a personal finance coach. Analyze these transactions and provide ONE specific actionable tip.
-You must also compare spending across months if the data spans more than one month.
-
-Transaction Data (CSV):
-{csv_data}
-
-  Return ONLY valid JSON in this exact format:
-
-{{
-  "tip": {{
-    "title": "Specific tip title based on the data",
-    "advice": "Detailed explanation citing specific transactions with dates and amounts, including month-over-month comparison when available",
-    "potential_savings": "$X-$Y/year based on your analysis",
-    "actionable_steps": [
-      "Step 1: Specific action with timeframe",
-      "Step 2: Another specific action",
-      "Step 3: Follow-up action"
-    ]
-  }},
-  "spending_insights": {{
-    "frequent_merchants": ["merchant1", "merchant2", "merchant3"],
-    "spending_trend": "Brief trend observation, including month-over-month comparison if applicable"
-  }}
-}}
-
-Expanded Analysis Rules (including month-over-month support)
-
-    1. Identify ONE clear actionable pattern:
-        * repeated merchants
-        * subscription/recurring charges
-        * fees
-        * large purchases
-        * category spikes
-        * meaningful changes between months
-
-    2. When data spans multiple months, calculate at least one month-over-month trend, such as:
-        * category increase/decrease
-        * recurring merchant variance
-        * total monthly spend shift
-        * volatility or irregular spikes
-
-    3. Cite specific transactions with merchant names, dates (YYYY-MM-DD), and amounts.
-
-    4. Calculate realistic savings projections based on the identified issue.
-
-    5. Provide 2–3 specific, practical steps with timeframes.
-
-    6. If no strong pattern exists, focus on the largest category or month with the biggest spending jump.
-
-    7. Stay strictly grounded in the provided data—do not invent charges, categories, or memberships."""
-    try:
-        # print(f"Prompt: {prompt}")
-        result = llm_generate_json(prompt, model=model, openai_api_key=openai_api_key, use_openai=use_openai)
-        if result.get('success'):
-            return {'success': True, 'analysis': result.get('data', {}), 'error': None}
-        return {'success': False, 'analysis': {}, 'error': result.get('error', 'Unknown error')}
-    except Exception as e:
-        return {'success': False, 'analysis': {}, 'error': str(e)}
 
 # ==================== ROUTES ====================
 
@@ -563,7 +313,7 @@ def get_finance_tip():
         
         tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai, model=model)
         
-        return jsonify({
+        response = jsonify({
             'success': tip_result['success'],
             'file_path': file_path,
             'transaction_count': len(transactions),
@@ -573,6 +323,16 @@ def get_finance_tip():
             'error': tip_result.get('error'),
             'timestamp': datetime.now().isoformat()
         })
+        
+        # Delete transaction data after request is complete
+        if file_path and file_path != 'uploaded_csv':
+            try:
+                Path(file_path).unlink(missing_ok=True)
+                logging.info(f"Deleted transaction file after processing: {file_path}")
+            except Exception as del_err:
+                logging.warning(f"Failed to delete transaction file {file_path}: {del_err}")
+        
+        return response
     except Exception as e:
         return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
 
@@ -594,7 +354,7 @@ def load_email_signups():
     return []
 
 
-def save_email_signup(email, name=None, source='web_app'):
+def save_email_signup(email, name=None):
     """Save a new email signup"""
     signups = load_email_signups()
     
@@ -607,7 +367,7 @@ def save_email_signup(email, name=None, source='web_app'):
         'email': email,
         'name': name,
         'signed_up_at': datetime.now().isoformat(),
-        'source': source
+        'source': 'web_app'
     }
     signups.append(signup)
     
@@ -629,12 +389,6 @@ def email_signup():
     
     email = (data.get('email') or '').strip().lower()
     name = (data.get('name') or '').strip() or None
-    source = (data.get('source') or '').strip() or 'web_app'
-    
-    # Validate source
-    valid_sources = ['insights', 'categorize', 'web_app']
-    if source not in valid_sources:
-        source = 'web_app'
     
     # Validate email
     if not email:
@@ -645,7 +399,7 @@ def email_signup():
     if not re.match(email_pattern, email):
         return jsonify({'error': 'Please enter a valid email address'}), 400
     
-    result = save_email_signup(email, name, source)
+    result = save_email_signup(email, name)
     
     if result['success']:
         logging.info(f"New email signup: {email}")
@@ -744,7 +498,7 @@ def categorize_transactions_api():
             category_summary[category]['count'] += 1
             category_summary[category]['total'] += amount
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'file_path': file_path,
             'transaction_count': len(categorized_transactions),
@@ -753,6 +507,16 @@ def categorize_transactions_api():
             'category_summary': category_summary,
             'timestamp': datetime.now().isoformat()
         })
+        
+        # Delete transaction data after request is complete
+        if file_path and file_path != 'uploaded_csv':
+            try:
+                Path(file_path).unlink(missing_ok=True)
+                logging.info(f"Deleted transaction file after processing: {file_path}")
+            except Exception as del_err:
+                logging.warning(f"Failed to delete transaction file {file_path}: {del_err}")
+        
+        return response
     except Exception as e:
         logging.exception("Transaction categorization failed")
         return jsonify({'error': f'Transaction categorization failed: {str(e)}'}), 500
