@@ -2,17 +2,6 @@
 
 A comprehensive personal finance application that integrates with Plaid API to fetch and analyze bank transactions, built with Flask and Python.
 
-## Features
-
-- 🏦 **Bank Integration**: Connect to your bank accounts via Plaid API
-- 📊 **Transaction Analysis**: Fetch and analyze your transaction history
-- 📁 **CSV Upload**: Upload your own transaction data from any bank or financial tool
-- 🤖 **AI-Powered Insights**: Get personalized finance tips using LLM analysis
-- 🏷️ **Smart Categorization**: Automatically categorize transactions with AI
-- 🏠 **Mortgage Analysis**: Tools for mortgage rate analysis and tracking
-- 🔐 **Secure Configuration**: Environment-based configuration for API keys
-- 🌐 **Web Interface**: Flask-based web application with user-friendly interface
-
 ## Project Structure
 
 ```
