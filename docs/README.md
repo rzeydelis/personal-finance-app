@@ -1,6 +1,6 @@
 # Personal Finance App
 
-A comprehensive personal finance application that integrates with Plaid API to fetch and analyze bank transactions, built with Flask and Python.
+A comprehensive personal finance application that integrates with Plaid API to fetch and analyze bank transactions, built with Flask and Python. Something to help me to keep track of my finances and making it easier with AI.
 
 ## Project Structure
 
