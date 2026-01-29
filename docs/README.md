@@ -1,4 +1,3 @@
-# THIS REPO WAS VIBE CODED SO DON'T EXPECT CODE TO BE CLEAN
 # Personal Finance App
 
 A comprehensive personal finance application that integrates with Plaid API to fetch and analyze bank transactions, built with Flask and Python.
