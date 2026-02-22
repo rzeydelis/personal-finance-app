@@ -395,6 +395,16 @@
       return userId;
     }
 
+    async function readJsonResponse(resp) {
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return resp.json();
+      }
+      const text = await resp.text();
+      const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+      throw new Error(`Unexpected response (${resp.status} ${resp.statusText}): ${snippet || 'empty body'}`);
+    }
+
     async function requestLinkToken() {
       const status = document.getElementById('initStatus');
       status.className = 'status visible loading';
@@ -406,7 +416,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: getSessionUserId() })
         });
-        const data = await resp.json();
+        const data = await readJsonResponse(resp);
 
         if (!resp.ok || !data.link_token) {
           throw new Error(data.error || 'Failed to initialize');
@@ -482,7 +492,7 @@
           body: JSON.stringify(payload)
         });
 
-        const data = await resp.json();
+        const data = await readJsonResponse(resp);
         if (!resp.ok || !data.success) {
           throw new Error(data.error || 'Connection failed');
         }
