@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import sys
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -215,7 +216,9 @@ def create_link_token_api():
     except Exception:
         data = {}
 
-    user_id = (data.get('user_id') or 'web_user').strip() or 'web_user'
+    user_id = (data.get('user_id') or '').strip()
+    if not user_id:
+        user_id = f"web_user_{uuid.uuid4().hex}"
 
     try:
         link_token = pipeline.create_link_token(user_id)
