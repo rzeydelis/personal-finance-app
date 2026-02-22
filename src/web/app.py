@@ -82,6 +82,15 @@ def get_bank_pipeline():
     return _bank_pipeline
 
 
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc):
+    """Return JSON for API routes and log the full exception."""
+    logging.exception("Unhandled error on %s %s", request.method, request.path)
+    if request.path.startswith('/api'):
+        return jsonify({'error': f'Internal server error: {type(exc).__name__}', 'path': request.path}), 500
+    return ("Internal server error. Check server logs for details.", 500)
+
+
 def fetch_fresh_transactions_from_plaid(days_back=90):
     """Fetch fresh transactions from Plaid API"""
     try:
