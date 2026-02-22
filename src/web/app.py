@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 
 from finance_tip import generate_finance_tip
@@ -36,6 +36,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Ensure project .env files are loaded even when running from a different working dir (e.g., Replit).
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(PROJECT_ROOT / "src" / "web" / ".env")
+load_dotenv()
+
 fetch_and_save_transactions = None
 store_access_token = None
 create_plaid_client = None
@@ -43,16 +48,24 @@ exchange_public_token = None
 PlaidAccessTokenError = RuntimeError  # type: ignore
 PlaidConfigurationError = RuntimeError  # type: ignore
 BankDataPipeline = None  # type: ignore
-from src.api.get_bank_trx import (
-    PlaidAccessTokenError,
-    PlaidConfigurationError,
-    create_plaid_client,
-    exchange_public_token,
-    fetch_and_save_transactions,
-    store_access_token,
-)
 
-from src.api.bank_data_pipeline import BankDataPipeline
+try:
+    from src.api.get_bank_trx import (
+        PlaidAccessTokenError,
+        PlaidConfigurationError,
+        create_plaid_client,
+        exchange_public_token,
+        fetch_and_save_transactions,
+        store_access_token,
+    )
+except Exception as exc:
+    logging.exception("Plaid helpers unavailable: %s", exc)
+
+try:
+    from src.api.bank_data_pipeline import BankDataPipeline
+except Exception as exc:
+    BankDataPipeline = None  # type: ignore
+    logging.exception("Plaid pipeline unavailable: %s", exc)
 
 
 
