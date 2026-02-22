@@ -382,6 +382,19 @@
 
     document.addEventListener('DOMContentLoaded', requestLinkToken);
 
+    function getSessionUserId() {
+      const storageKey = 'plaid_user_id';
+      let userId = sessionStorage.getItem(storageKey);
+      if (!userId) {
+        const randomId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+          ? window.crypto.randomUUID()
+          : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        userId = `web_user_${randomId}`;
+        sessionStorage.setItem(storageKey, userId);
+      }
+      return userId;
+    }
+
     async function requestLinkToken() {
       const status = document.getElementById('initStatus');
       status.className = 'status visible loading';
@@ -391,7 +404,7 @@
         const resp = await fetch('/api/link-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: 'web_user' })
+          body: JSON.stringify({ user_id: getSessionUserId() })
         });
         const data = await resp.json();
 
