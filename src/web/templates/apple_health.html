@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apple Health Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-light: #818cf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.3fr 0.9fr;
+      gap: 18px;
+      padding: 32px 0 24px;
+      align-items: stretch;
+    }
+
+    .hero-card,
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), transparent 55%);
+      pointer-events: none;
+    }
+
+    .hero-card > * { position: relative; z-index: 1; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-glow);
+      color: var(--accent-light);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin: 0 0 10px;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.65;
+      font-size: 0.98rem;
+    }
+
+    .hero-points {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .hero-point {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      font-size: 0.92rem;
+    }
+
+    .hero-point strong { color: var(--text); }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title .icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background: var(--accent-glow);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      color: var(--accent-light);
+      font-weight: 700;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.94rem;
+      outline: none;
+    }
+
+    .field input:focus,
+    .field select:focus { border-color: var(--accent); }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 34px 22px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+    }
+
+    .file-drop:hover,
+    .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-drop-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .file-drop-text {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .file-info {
+      display: none;
+      margin-top: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-info.visible { display: flex; }
+    .file-name { flex: 1; font-size: 0.92rem; }
+    .file-state { color: var(--success); font-size: 0.84rem; }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .status {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 0.92rem;
+    }
+
+    .status.visible { display: flex; }
+    .status.loading {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results { display: none; }
+    .results.visible { display: grid; gap: 16px; }
+
+    .stats-grid,
+    .metrics-grid,
+    .list-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .list-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .stat-card,
+    .metric-card,
+    .list-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .stat-label,
+    .metric-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .stat-detail,
+    .metric-trend {
+      margin-top: 8px;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .metric-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0 0 14px;
+    }
+
+    .summary-copy {
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 0.96rem;
+      margin: 0;
+    }
+
+    .summary-headline {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 0 0 10px;
+    }
+
+    .list-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .list-card li + li { margin-top: 8px; }
+
+    .recommendations {
+      display: grid;
+      gap: 12px;
+    }
+
+    .recommendation {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .recommendation-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .recommendation-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .badge-high {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .badge-medium {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    .badge-low {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .recommendation-copy,
+    .disclaimer {
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 0.92rem;
+    }
+
+    .code-note {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.16);
+    }
+
+    .code-note strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--success);
+      font-size: 0.88rem;
+    }
+
+    .code-note code {
+      display: block;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: Consolas, 'SF Mono', Monaco, monospace;
+      color: var(--text);
+      font-size: 0.84rem;
+    }
+
+    @media (max-width: 960px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid,
+      .stats-grid,
+      .metrics-grid,
+      .list-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero h1 { font-size: 1.7rem; }
+      .field-grid,
+      .stats-grid,
+      .metrics-grid,
+      .list-grid {
+        grid-template-columns: 1fr;
+      }
+      .btn-row { flex-direction: column; }
+      .btn-row .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">Pluto Finance</div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
+        <a href="/categorize">Categorize</a>
+        <a href="/health" class="active">Health</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="hero">
+        <div class="hero-card">
+          <div class="eyebrow">Apple Health</div>
+          <h1>Analyze your Apple Health export with ChatGPT</h1>
+          <p>
+            Upload your Apple Health <code>export.xml</code>, parse it locally into a compact summary,
+            then send only that parsed summary to OpenAI for analysis. The raw XML is not forwarded to the model.
+          </p>
+          <div class="hero-points">
+            <div class="hero-point"><strong>Required:</strong> your OpenAI API key is entered on this page for each run.</div>
+            <div class="hero-point"><strong>Parsed locally:</strong> steps, sleep, workouts, heart metrics, energy, weight, and other supported series.</div>
+            <div class="hero-point"><strong>Standalone script:</strong> use <code>python scripts/parse_apple_health.py path\to\export.xml</code> if you want a JSON summary without the web UI.</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <h2 class="card-title"><span class="icon">XML</span>Upload Export</h2>
+            <div class="file-drop" id="fileDrop" onclick="document.getElementById('appleHealthInput').click()">
+              <div class="file-drop-title">Select Apple Health export.xml</div>
+              <div class="file-drop-text">
+                Click to choose a file or drag it here.<br>
+                Large exports are supported up to 350MB.
+              </div>
+            </div>
+            <input
+              type="file"
+              id="appleHealthInput"
+              accept=".xml,text/xml,application/xml"
+              style="display:none"
+              onchange="handleFileSelect(event)"
+            />
+            <div class="file-info" id="fileInfo">
+              <div class="file-name" id="fileName"></div>
+              <div class="file-state">Ready for analysis</div>
+              <button class="btn btn-secondary" type="button" onclick="clearFile()">Clear</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title"><span class="icon">AI</span>OpenAI Settings</h2>
+            <div class="field-grid">
+              <div class="field">
+                <label for="lookbackDays">Lookback Days</label>
+                <input type="number" id="lookbackDays" value="90" min="7" max="365" />
+              </div>
+              <div class="field">
+                <label for="modelSelect">Model</label>
+                <select id="modelSelect">
+                  <option value="gpt-5-mini">gpt-5-mini</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="openaiApiKey">OpenAI API Key</label>
+                <input type="password" id="openaiApiKey" placeholder="sk-..." />
+              </div>
+            </div>
+            <p class="hint">The key is used only for this request. Apple Health analysis on this page always uses OpenAI.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title"><span class="icon">RUN</span>Run Analysis</h2>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="analyzeBtn" type="button" onclick="analyzeHealthData()">Analyze Apple Health Data</button>
+          <button class="btn btn-secondary" id="copyBtn" type="button" onclick="copyAnalysis()" disabled>Copy Analysis</button>
+        </div>
+        <div class="status" id="status">
+          <div class="spinner"></div>
+          <span id="statusText">Parsing Apple Health export...</span>
+        </div>
+        <div class="code-note">
+          <strong>Parser script</strong>
+          <code>python scripts/parse_apple_health.py path\to\export.xml -o apple_health_summary.json</code>
+        </div>
+      </section>
+
+      <section class="results" id="results">
+        <div class="card">
+          <h2 class="summary-headline" id="summaryHeadline">Apple Health Analysis</h2>
+          <p class="summary-copy" id="summaryOverview"></p>
+        </div>
+
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="card">
+          <h2 class="section-title">Metric Highlights</h2>
+          <div class="metrics-grid" id="metricsGrid"></div>
+        </div>
+
+        <div class="list-grid">
+          <div class="list-card">
+            <h2 class="section-title">Strengths</h2>
+            <ul id="strengthsList"></ul>
+          </div>
+          <div class="list-card">
+            <h2 class="section-title">Watchouts</h2>
+            <ul id="watchoutsList"></ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">Recommendations</h2>
+          <div class="recommendations" id="recommendationsList"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">Workout Story</h2>
+          <p class="summary-copy" id="workoutStory"></p>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">Important Note</h2>
+          <p class="disclaimer" id="disclaimerText"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let uploadedFile = null;
+    let lastResult = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadModels();
+      setupDragDrop();
+    });
+
+    async function loadModels() {
+      try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '';
+        (data.models || []).forEach(model => {
+          const option = document.createElement('option');
+          option.value = model;
+          option.textContent = model;
+          if (model === (data.default || 'gpt-5-mini')) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Failed to load models', err);
+      }
+    }
+
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.remove('dragover');
+        });
+      });
+      drop.addEventListener('drop', event => {
+        const [file] = event.dataTransfer.files;
+        if (file) {
+          processFile(file);
+        }
+      });
+    }
+
+    function handleFileSelect(event) {
+      const [file] = event.target.files;
+      if (file) {
+        processFile(file);
+      }
+    }
+
+    function processFile(file) {
+      if (!file.name.toLowerCase().endsWith('.xml')) {
+        showStatus('error', 'Please choose an Apple Health XML file.');
+        return;
+      }
+
+      uploadedFile = file;
+      document.getElementById('fileName').textContent = `${file.name} (${formatBytes(file.size)})`;
+      document.getElementById('fileInfo').classList.add('visible');
+      document.getElementById('fileDrop').style.display = 'none';
+      hideStatus();
+    }
+
+    function clearFile() {
+      uploadedFile = null;
+      document.getElementById('appleHealthInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('fileDrop').style.display = 'block';
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      const value = bytes / (1024 ** exponent);
+      return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+    }
+
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      const text = document.getElementById('statusText');
+      status.className = `status visible ${type}`;
+      text.textContent = message;
+      const spinner = status.querySelector('.spinner');
+      spinner.style.display = type === 'loading' ? 'block' : 'none';
+    }
+
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    async function readJsonResponse(resp) {
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return resp.json();
+      }
+      const text = await resp.text();
+      throw new Error(text || `Unexpected response (${resp.status})`);
+    }
+
+    async function analyzeHealthData() {
+      if (!uploadedFile) {
+        showStatus('error', 'Upload your Apple Health export.xml file first.');
+        return;
+      }
+
+      const apiKey = document.getElementById('openaiApiKey').value.trim();
+      if (!apiKey) {
+        showStatus('error', 'Enter your OpenAI API key before running analysis.');
+        return;
+      }
+
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const results = document.getElementById('results');
+
+      analyzeBtn.disabled = true;
+      copyBtn.disabled = true;
+      results.classList.remove('visible');
+      showStatus('loading', 'Parsing Apple Health export and sending the summary to OpenAI...');
+
+      try {
+        const formData = new FormData();
+        formData.append('apple_health_file', uploadedFile);
+        formData.append('openai_api_key', apiKey);
+        formData.append('model', document.getElementById('modelSelect').value);
+        formData.append('lookback_days', document.getElementById('lookbackDays').value || '90');
+
+        const resp = await fetch('/api/apple-health/analyze', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await readJsonResponse(resp);
+        if (!resp.ok || !data.success) {
+          throw new Error(data.error || 'Apple Health analysis failed.');
+        }
+
+        lastResult = data;
+        renderResult(data);
+        showStatus('success', 'Apple Health analysis complete.');
+        results.classList.add('visible');
+        copyBtn.disabled = false;
+      } catch (err) {
+        showStatus('error', err.message || 'Apple Health analysis failed.');
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    }
+
+    function renderResult(data) {
+      const parsedSummary = data.parsed_summary || {};
+      const metadata = parsedSummary.metadata || {};
+      const analysis = data.analysis || {};
+      const workoutSummary = parsedSummary.workout_summary || {};
+      const dateRange = parsedSummary.date_range || {};
+      const availableMetrics = Array.isArray(metadata.available_metrics) ? metadata.available_metrics : [];
+      const topWorkoutTypes = Array.isArray(workoutSummary.top_workout_types) ? workoutSummary.top_workout_types : [];
+
+      document.getElementById('summaryHeadline').textContent =
+        analysis.summary?.headline || 'Apple Health Analysis';
+      document.getElementById('summaryOverview').textContent =
+        analysis.summary?.overview || 'No summary returned.';
+
+      document.getElementById('statsGrid').innerHTML = [
+        renderStatCard('Records Parsed', metadata.records_processed || 0, `${availableMetrics.length} metric families`),
+        renderStatCard('Workouts', workoutSummary.total_workouts || 0, topWorkoutTypes.length ? topWorkoutTypes.map(item => item.type).slice(0, 3).join(', ') : 'No workout types detected'),
+        renderStatCard('Date Range', dateRange.start || 'N/A', dateRange.end ? `through ${dateRange.end}` : 'No date coverage'),
+        renderStatCard('Lookback', `${data.lookback_days || parsedSummary.lookback_days || 90} days`, data.model || 'OpenAI')
+      ].join('');
+
+      const metricHighlights = Array.isArray(analysis.metric_highlights) ? analysis.metric_highlights : [];
+      document.getElementById('metricsGrid').innerHTML = metricHighlights.length
+        ? metricHighlights.map(renderMetricCard).join('')
+        : '<div class="metric-card"><div class="metric-label">No highlights</div><div class="metric-value">The model did not return metric highlights.</div></div>';
+
+      renderList('strengthsList', analysis.strengths, 'No strengths were returned.');
+      renderList('watchoutsList', analysis.watchouts, 'No watchouts were returned.');
+
+      const recommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
+      document.getElementById('recommendationsList').innerHTML = recommendations.length
+        ? recommendations.map(renderRecommendation).join('')
+        : '<div class="recommendation"><div class="recommendation-title">No recommendations returned.</div></div>';
+
+      document.getElementById('workoutStory').textContent =
+        analysis.workout_story || 'Workout analysis was not available.';
+      document.getElementById('disclaimerText').textContent =
+        analysis.disclaimer || 'This analysis is informational only and is not medical advice.';
+    }
+
+    function renderStatCard(label, value, detail) {
+      return `
+        <div class="stat-card">
+          <div class="stat-label">${escapeHtml(String(label))}</div>
+          <div class="stat-value">${escapeHtml(String(value))}</div>
+          <div class="stat-detail">${escapeHtml(String(detail || ''))}</div>
+        </div>
+      `;
+    }
+
+    function renderMetricCard(item) {
+      return `
+        <div class="metric-card">
+          <div class="metric-label">${escapeHtml(item.metric || 'Metric')}</div>
+          <div class="metric-value">${escapeHtml(item.value || 'N/A')}</div>
+          <div class="metric-trend">${escapeHtml(item.trend || 'No trend provided.')}</div>
+          <div class="metric-trend">${escapeHtml(item.insight || '')}</div>
+        </div>
+      `;
+    }
+
+    function renderRecommendation(item) {
+      const priority = (item.priority || 'medium').toLowerCase();
+      const badgeClass = ['high', 'medium', 'low'].includes(priority) ? priority : 'medium';
+      return `
+        <div class="recommendation">
+          <div class="recommendation-head">
+            <div class="recommendation-title">${escapeHtml(item.title || 'Recommendation')}</div>
+            <span class="badge badge-${badgeClass}">${escapeHtml(priority)}</span>
+          </div>
+          <div class="recommendation-copy">${escapeHtml(item.why_it_matters || '')}</div>
+          <div class="recommendation-copy" style="margin-top:8px;"><strong style="color:var(--text);">Next step:</strong> ${escapeHtml(item.next_step || '')}</div>
+        </div>
+      `;
+    }
+
+    function renderList(elementId, items, fallback) {
+      const list = document.getElementById(elementId);
+      const values = Array.isArray(items) ? items : [];
+      if (!values.length) {
+        list.innerHTML = `<li>${escapeHtml(fallback)}</li>`;
+        return;
+      }
+      list.innerHTML = values.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function copyAnalysis() {
+      if (!lastResult) {
+        return;
+      }
+
+      const analysis = lastResult.analysis || {};
+      const parsed = lastResult.parsed_summary || {};
+      const metadata = parsed.metadata || {};
+      const lines = [];
+
+      lines.push(analysis.summary?.headline || 'Apple Health Analysis');
+      lines.push('');
+      lines.push(analysis.summary?.overview || '');
+      lines.push('');
+      lines.push(`Records parsed: ${metadata.records_processed || 0}`);
+      lines.push(`Workouts parsed: ${parsed.workout_summary?.total_workouts || 0}`);
+      lines.push(`Lookback: ${lastResult.lookback_days || parsed.lookback_days || 90} days`);
+      lines.push('');
+
+      const highlights = Array.isArray(analysis.metric_highlights) ? analysis.metric_highlights : [];
+      if (highlights.length) {
+        lines.push('Metric Highlights:');
+        highlights.forEach(item => {
+          lines.push(`- ${item.metric || 'Metric'}: ${item.value || 'N/A'}${item.trend ? ` (${item.trend})` : ''}`);
+          if (item.insight) {
+            lines.push(`  ${item.insight}`);
+          }
+        });
+        lines.push('');
+      }
+
+      const recommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
+      if (recommendations.length) {
+        lines.push('Recommendations:');
+        recommendations.forEach(item => {
+          lines.push(`- [${(item.priority || 'medium').toUpperCase()}] ${item.title || 'Recommendation'}`);
+          if (item.why_it_matters) {
+            lines.push(`  Why: ${item.why_it_matters}`);
+          }
+          if (item.next_step) {
+            lines.push(`  Next: ${item.next_step}`);
+          }
+        });
+        lines.push('');
+      }
+
+      if (analysis.disclaimer) {
+        lines.push(`Note: ${analysis.disclaimer}`);
+      }
+
+      await navigator.clipboard.writeText(lines.join('\n'));
+      showStatus('success', 'Analysis copied to clipboard.');
+    }
+  </script>
+</body>
+</html>

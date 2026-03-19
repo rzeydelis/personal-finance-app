@@ -8,12 +8,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from finance_tip import generate_finance_tip
 from utils import parse_csv_transactions
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+app.config['MAX_CONTENT_LENGTH'] = 350 * 1024 * 1024  # 350MB max upload size
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -41,6 +42,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 load_dotenv(PROJECT_ROOT / "src" / "web" / ".env")
 load_dotenv()
 
+parse_apple_health_export = None
+generate_apple_health_analysis = None
+
 fetch_and_save_transactions = None
 store_access_token = None
 create_plaid_client = None
@@ -67,6 +71,21 @@ except Exception as exc:
     BankDataPipeline = None  # type: ignore
     logging.exception("Plaid pipeline unavailable: %s", exc)
 
+try:
+    from src.api.apple_health_parser import parse_apple_health_export
+except Exception as exc:
+    parse_apple_health_export = None  # type: ignore
+    logging.exception("Apple Health parser unavailable: %s", exc)
+
+try:
+    from .apple_health_analysis import generate_apple_health_analysis
+except Exception:
+    try:
+        from apple_health_analysis import generate_apple_health_analysis
+    except Exception as exc:
+        generate_apple_health_analysis = None  # type: ignore
+        logging.exception("Apple Health analysis unavailable: %s", exc)
+
 
 
 _bank_pipeline = None
@@ -89,6 +108,14 @@ def handle_unexpected_error(exc):
     if request.path.startswith('/api'):
         return jsonify({'error': f'Internal server error: {type(exc).__name__}', 'path': request.path}), 500
     return ("Internal server error. Check server logs for details.", 500)
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_too_large(exc):
+    """Return a clear upload-size error for API routes."""
+    if request.path.startswith('/api'):
+        return jsonify({'error': 'Uploaded file is too large. Apple Health XML uploads are limited to 350MB.'}), 413
+    return ('Uploaded file is too large. Apple Health XML uploads are limited to 350MB.', 413)
 
 
 def fetch_fresh_transactions_from_plaid(days_back=90):
@@ -278,10 +305,71 @@ def categorize_page():
     return render_template('categorize_transactions.html')
 
 
+@app.route('/health')
+def apple_health_page():
+    """Apple Health upload and analysis page."""
+    return render_template('apple_health.html')
+
+
 @app.route('/plaid-link')
 def plaid_link_page():
     """Helper page to run Plaid Link and capture tokens."""
     return render_template('plaid_link.html')
+
+
+@app.route('/api/apple-health/analyze', methods=['POST'])
+def analyze_apple_health_api():
+    """Parse an Apple Health export.xml file and analyze the summary with OpenAI."""
+    if not parse_apple_health_export or not generate_apple_health_analysis:
+        return jsonify({'error': 'Apple Health analysis is unavailable on this server.'}), 500
+
+    uploaded_file = request.files.get('apple_health_file')
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({'error': 'Upload an Apple Health export.xml file.'}), 400
+
+    if not uploaded_file.filename.lower().endswith('.xml'):
+        return jsonify({'error': 'Apple Health uploads must be XML files.'}), 400
+
+    openai_api_key = (request.form.get('openai_api_key') or '').strip()
+    if not openai_api_key:
+        return jsonify({'error': 'OpenAI API key is required for Apple Health analysis.'}), 400
+
+    model = (request.form.get('model') or 'gpt-5-mini').strip() or 'gpt-5-mini'
+    lookback_raw = request.form.get('lookback_days', '90')
+    try:
+        lookback_days = int(lookback_raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Lookback days must be a whole number.'}), 400
+
+    lookback_days = max(7, min(lookback_days, 365))
+
+    logging.info(
+        "Parsing Apple Health upload %s with lookback=%s days",
+        uploaded_file.filename,
+        lookback_days,
+    )
+    parse_result = parse_apple_health_export(uploaded_file.stream, lookback_days=lookback_days)
+    if not parse_result.get('success'):
+        return jsonify({'error': parse_result.get('error', 'Failed to parse Apple Health export.')}), 400
+
+    health_summary = parse_result.get('summary', {})
+    analysis_result = generate_apple_health_analysis(
+        health_summary,
+        openai_api_key=openai_api_key,
+        model=model,
+    )
+    if not analysis_result.get('success'):
+        return jsonify({'error': analysis_result.get('error', 'Apple Health analysis failed.')}), 500
+
+    return jsonify({
+        'success': True,
+        'file_name': uploaded_file.filename,
+        'lookback_days': lookback_days,
+        'model': model,
+        'parsed_summary': health_summary,
+        'analysis': analysis_result.get('analysis', {}),
+        'timestamp': datetime.now().isoformat(),
+    })
 
 @app.route('/api/finance-tip', methods=['POST'])
 def get_finance_tip():
