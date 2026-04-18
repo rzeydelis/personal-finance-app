@@ -428,6 +428,21 @@
       color: var(--accent-light);
     }
 
+    .chip-high {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+    }
+
+    .chip-medium {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+    }
+
+    .chip-low {
+      background: rgba(239, 68, 68, 0.18);
+      color: #fca5a5;
+    }
+
     .merchant-list {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -495,7 +510,6 @@
       <div class="logo">Pluto Finance</div>
       <div class="nav-links">
         <a href="/">Insights</a>
-        <a href="/subscriptions">Subscriptions</a>
         <a href="/monthly-spend" class="active">Monthly Spend</a>
         <a href="/health">Health</a>
         <a href="/plaid-link">Connect Bank</a>
@@ -509,7 +523,8 @@
           <h1>See what you spent in a month and where it went.</h1>
           <p>
             Pick a month and get a category-level spend breakdown using the existing categorization feature.
-            Transfers to investment destinations like Vanguard and Gemini are grouped into Savings instead of spend.
+            Transfers to investment destinations like Vanguard and Gemini are grouped into Savings instead of spend,
+            and recurring subscription signals are surfaced in the same analysis.
           </p>
         </div>
         <div class="hero-side">
@@ -518,6 +533,7 @@
             <li>Total expenditure for the selected month</li>
             <li>Total savings transfers in the same month</li>
             <li>Spend by category and top merchants within each category</li>
+            <li>Detected recurring subscription charges and estimated subscription impact</li>
           </ul>
         </div>
       </section>
@@ -629,6 +645,32 @@
         <div class="card">
           <h2 class="card-title">Top Spend Merchants</h2>
           <div class="merchant-list" id="merchantList"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Subscription Analysis</h2>
+          <div class="source-copy" id="subscriptionStatus" style="margin-bottom: 12px;">
+            Run the analysis to detect recurring subscription-like charges.
+          </div>
+          <div class="stats-grid" id="subscriptionStatsGrid"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Merchant</th>
+                  <th>Confidence</th>
+                  <th>Cadence</th>
+                  <th>Month Charges</th>
+                  <th>Monthly Estimate</th>
+                  <th>Last Charge</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="subscriptionTableBody">
+                <tr><td colspan="7"><div class="empty-state">Run the analysis to view detected recurring charges.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="card">
@@ -797,6 +839,13 @@
       return `$${amount.toFixed(2)}`;
     }
 
+    function confidenceChipClass(confidence) {
+      const normalized = String(confidence || '').toLowerCase();
+      if (normalized === 'high') return 'chip chip-high';
+      if (normalized === 'medium') return 'chip chip-medium';
+      return 'chip chip-low';
+    }
+
     function buildPayload(selectedMonth = '') {
       const payload = {
         fetch_fresh: document.getElementById('fetchFresh').checked,
@@ -885,6 +934,9 @@
       const categoryTableBody = document.getElementById('categoryTableBody');
       const merchantList = document.getElementById('merchantList');
       const monthHeader = document.getElementById('monthHeader');
+      const subscriptionStatus = document.getElementById('subscriptionStatus');
+      const subscriptionStatsGrid = document.getElementById('subscriptionStatsGrid');
+      const subscriptionTableBody = document.getElementById('subscriptionTableBody');
 
       monthHeader.textContent = `Selected Month: ${escapeHtml(data.selected_month_label || data.selected_month || '')}`;
 
@@ -952,6 +1004,71 @@
             <div class="merchant-value">${escapeHtml(item.display || formatMoney(item.amount || 0))}</div>
           </div>
         `).join('');
+      }
+
+      const subscriptionSummary = data.subscription_summary || {};
+      const selectedMonthSubscriptions = Array.isArray(data.selected_month_subscriptions) ? data.selected_month_subscriptions : [];
+      const subscriptionError = String(data.subscription_analysis_error || '').trim();
+      const totalSubscriptions = Number(subscriptionSummary.total_subscriptions || 0);
+      const selectedMonthSubscriptionCount = Number(subscriptionSummary.selected_month_subscription_count || 0);
+      const selectedMonthSubscriptionSpend = Number(subscriptionSummary.selected_month_spend || 0);
+      const estimatedMonthlySubscriptionSpend = Number(subscriptionSummary.total_monthly_spend || 0);
+      const estimatedAnnualSubscriptionSpend = Number(subscriptionSummary.total_annual_spend || 0);
+      const highConfidenceSubscriptions = Number(subscriptionSummary.high_confidence_count || 0);
+      const mediumConfidenceSubscriptions = Number(subscriptionSummary.medium_confidence_count || 0);
+
+      if (subscriptionError) {
+        subscriptionStatus.textContent = subscriptionError;
+        subscriptionStatsGrid.innerHTML = '';
+        subscriptionTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${escapeHtml(subscriptionError)}</div></td></tr>`;
+      } else {
+        subscriptionStatus.textContent = `Detected ${selectedMonthSubscriptionCount} recurring merchant(s) with charges in ${data.selected_month_label || data.selected_month || 'the selected month'} from ${totalSubscriptions} recurring candidates in the current lookback window.`;
+        subscriptionStatsGrid.innerHTML = `
+          <div class="stat-card">
+            <div class="stat-label">Detected This Month</div>
+            <div class="stat-value">${selectedMonthSubscriptionCount}</div>
+            <div class="stat-detail">${formatMoney(selectedMonthSubscriptionSpend)} charged in this month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Window Monthly Estimate</div>
+            <div class="stat-value">${formatMoney(estimatedMonthlySubscriptionSpend)}</div>
+            <div class="stat-detail">Projected recurring monthly impact across detected subscriptions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Window Annual Estimate</div>
+            <div class="stat-value">${formatMoney(estimatedAnnualSubscriptionSpend)}</div>
+            <div class="stat-detail">Projected yearly cost if recurring charges stay active</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Confidence Mix</div>
+            <div class="stat-value">${highConfidenceSubscriptions}</div>
+            <div class="stat-detail">High confidence, plus ${mediumConfidenceSubscriptions} medium confidence</div>
+          </div>
+        `;
+
+        if (!selectedMonthSubscriptions.length) {
+          const noMatchMessage = totalSubscriptions
+            ? 'Recurring candidates were found in the lookback window, but none posted in the selected month.'
+            : 'No recurring subscription-like charges were detected for the current dataset.';
+          subscriptionTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${escapeHtml(noMatchMessage)}</div></td></tr>`;
+        } else {
+          subscriptionTableBody.innerHTML = selectedMonthSubscriptions.map(item => {
+            const confidenceClass = confidenceChipClass(item.confidence || 'low');
+            const monthChargeCount = Number(item.selected_month_charge_count || 0);
+            const monthSpendDisplay = item.selected_month_spend_display || formatMoney(item.selected_month_spend_amount || 0);
+            return `
+              <tr>
+                <td>${escapeHtml(item.merchant || 'Unknown merchant')}</td>
+                <td><span class="${confidenceClass}">${escapeHtml(item.confidence || 'low')}</span></td>
+                <td>${escapeHtml(item.cadence || 'irregular')}</td>
+                <td>${monthChargeCount} charge(s), ${escapeHtml(monthSpendDisplay)}</td>
+                <td>${formatMoney(item.monthly_cost_estimate || 0)}</td>
+                <td>${escapeHtml(item.selected_month_last_charge_date || item.last_charge_date || 'n/a')}</td>
+                <td>${escapeHtml(item.reason || 'Recurring activity detected.')}</td>
+              </tr>
+            `;
+          }).join('');
+        }
       }
 
       allDebugTransactions = Array.isArray(data.transactions) ? data.transactions : [];

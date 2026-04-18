@@ -4,10 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, IO, Iterable, Optional, Tuple, Union
 
-try:
-    from defusedxml import ElementTree as ET
-except Exception:
-    import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 
 
 APPLE_HEALTH_DATE_FORMATS = (

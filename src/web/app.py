@@ -3,13 +3,17 @@ import logging
 import os
 import re
 import sys
+import threading
+import time
 import uuid
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from ipaddress import ip_address
 from pathlib import Path
+import hmac
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from finance_tip import generate_finance_tip
@@ -41,19 +45,47 @@ except Exception:
         merchant_text,
     )
 
+def _fallback_normalize_subscription_merchant(name):
+    return (name or 'unknown').strip().lower()
+
+
 try:
     from .subscription_finder import identify_subscriptions
+    from .subscription_finder import normalize_merchant_name as normalize_subscription_merchant_name
 except Exception:
     try:
         from subscription_finder import identify_subscriptions
+        from subscription_finder import normalize_merchant_name as normalize_subscription_merchant_name
     except Exception as exc:
         identify_subscriptions = None  # type: ignore
+        normalize_subscription_merchant_name = _fallback_normalize_subscription_merchant  # type: ignore
         logging.exception("Subscription analysis unavailable: %s", exc)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 350 * 1024 * 1024  # 350MB max upload size
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+API_AUTH_TOKEN = (os.getenv('APP_API_TOKEN') or '').strip()
+MAX_JSON_BODY_BYTES = int(os.getenv('MAX_JSON_BODY_BYTES', str(5 * 1024 * 1024)))
+API_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('API_RATE_LIMIT_WINDOW_SECONDS', '60'))
+API_RATE_LIMIT_MAX_REQUESTS = int(os.getenv('API_RATE_LIMIT_MAX_REQUESTS', '120'))
+LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1'}
+PROTECTED_API_PATHS = {
+    '/api/plaid-token',
+    '/api/link-token',
+    '/api/finance-tip',
+    '/api/monthly-spend',
+    '/api/apple-health/analyze',
+}
+_api_rate_buckets = defaultdict(deque)
+_api_rate_lock = threading.Lock()
+
+if not API_AUTH_TOKEN:
+    logging.warning(
+        "APP_API_TOKEN is not set. Protected APIs are restricted to loopback requests only. "
+        "Set APP_API_TOKEN for secure remote access."
+    )
 
 # LLM client
 try:
@@ -135,12 +167,113 @@ def get_bank_pipeline():
     return _bank_pipeline
 
 
+def get_request_id():
+    return getattr(g, 'request_id', None) or uuid.uuid4().hex[:12]
+
+
+def get_client_ip():
+    return request.remote_addr or ''
+
+
+def get_request_host():
+    host = (request.host or '').split(':', 1)[0].strip().lower()
+    return host
+
+
+def is_loopback_ip(ip_text):
+    try:
+        return ip_address(ip_text).is_loopback
+    except ValueError:
+        return False
+
+
+def is_local_request_without_proxy():
+    client_ip = get_client_ip()
+    if not is_loopback_ip(client_ip):
+        return False
+
+    request_host = get_request_host()
+    if request_host not in LOCAL_HOSTS:
+        return False
+
+    forwarded_for = (request.headers.get('X-Forwarded-For') or '').strip()
+    return not forwarded_for
+
+
+def extract_api_token():
+    auth_header = (request.headers.get('Authorization') or '').strip()
+    if auth_header.lower().startswith('bearer '):
+        return auth_header[7:].strip()
+
+    header_token = (request.headers.get('X-API-Key') or '').strip()
+    if header_token:
+        return header_token
+
+    form_token = (request.form.get('api_token') or '').strip()
+    if form_token:
+        return form_token
+
+    if request.is_json:
+        try:
+            return (request.get_json(silent=True) or {}).get('api_token', '').strip()
+        except Exception:
+            return ''
+    return ''
+
+
+def check_api_rate_limit(client_ip):
+    now = time.time()
+    with _api_rate_lock:
+        bucket = _api_rate_buckets[client_ip]
+        while bucket and (now - bucket[0]) > API_RATE_LIMIT_WINDOW_SECONDS:
+            bucket.popleft()
+        if len(bucket) >= API_RATE_LIMIT_MAX_REQUESTS:
+            return False
+        bucket.append(now)
+    return True
+
+
+def api_error(message, status_code=400):
+    return jsonify({'error': message, 'request_id': get_request_id()}), status_code
+
+
+@app.before_request
+def enforce_api_security():
+    g.request_id = uuid.uuid4().hex[:12]
+
+    if request.path.startswith('/api'):
+        client_ip = get_client_ip()
+        if not check_api_rate_limit(client_ip):
+            return api_error('Too many requests. Please slow down and retry shortly.', 429)
+
+        if request.method in {'POST', 'PUT', 'PATCH'} and request.is_json:
+            content_length = request.content_length or 0
+            if content_length > MAX_JSON_BODY_BYTES:
+                return api_error('JSON payload is too large for this endpoint.', 413)
+
+    if request.path not in PROTECTED_API_PATHS:
+        return None
+
+    provided_token = extract_api_token()
+    if API_AUTH_TOKEN:
+        if not provided_token or not hmac.compare_digest(provided_token, API_AUTH_TOKEN):
+            return api_error('Unauthorized API request. Provide a valid API token.', 401)
+        return None
+
+    if is_local_request_without_proxy():
+        return None
+    return api_error(
+        'Protected API access is disabled for remote clients until APP_API_TOKEN is configured.',
+        403,
+    )
+
+
 @app.errorhandler(Exception)
 def handle_unexpected_error(exc):
     """Return JSON for API routes and log the full exception."""
     logging.exception("Unhandled error on %s %s", request.method, request.path)
     if request.path.startswith('/api'):
-        return jsonify({'error': f'Internal server error: {type(exc).__name__}', 'path': request.path}), 500
+        return api_error('Internal server error.', 500)
     return ("Internal server error. Check server logs for details.", 500)
 
 
@@ -148,16 +281,33 @@ def handle_unexpected_error(exc):
 def handle_request_too_large(exc):
     """Return a clear upload-size error for API routes."""
     if request.path.startswith('/api'):
-        return jsonify({'error': 'Uploaded file is too large. Apple Health XML uploads are limited to 350MB.'}), 413
+        return api_error('Uploaded file is too large. Apple Health XML uploads are limited to 350MB.', 413)
     return ('Uploaded file is too large. Apple Health XML uploads are limited to 350MB.', 413)
 
 
 @app.after_request
 def set_security_headers(response):
     """Set baseline HTTP security headers."""
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.plaid.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data:; "
+        "connect-src 'self' https://api.openai.com http://localhost:11434 https://localhost:11434; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    )
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Content-Security-Policy'] = csp
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['X-Request-ID'] = get_request_id()
+    if request.path.startswith('/api'):
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Pragma'] = 'no-cache'
+    if request.is_secure or request.headers.get('X-Forwarded-Proto', '').lower() == 'https':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 
@@ -184,13 +334,13 @@ def fetch_fresh_transactions_from_plaid(days_back=90):
             )
             return {'success': True, 'file_path': file_path, 'error': None}
         return {'success': False, 'file_path': None, 'error': 'Transaction file was not created'}
-    except PlaidConfigurationError as e:
-        return {'success': False, 'file_path': None, 'error': f'Plaid configuration error: {e}'}
-    except PlaidAccessTokenError as e:
-        return {'success': False, 'file_path': None, 'error': str(e)}
+    except PlaidConfigurationError:
+        return {'success': False, 'file_path': None, 'error': 'Plaid integration is not configured correctly.'}
+    except PlaidAccessTokenError:
+        return {'success': False, 'file_path': None, 'error': 'No valid Plaid access token is available. Reconnect your bank.'}
     except Exception as e:
         logging.exception("Unexpected error fetching transactions from Plaid")
-        return {'success': False, 'file_path': None, 'error': str(e)}
+        return {'success': False, 'file_path': None, 'error': 'Unexpected Plaid fetch error.'}
 
 def fetch_latest_transactions():
     """Fetch latest transactions from data directory"""
@@ -202,7 +352,8 @@ def fetch_latest_transactions():
             return {'success': True, 'file_path': str(latest_file), 'error': None}
         return {'success': False, 'file_path': None, 'error': 'No transaction files found'}
     except Exception as e:
-        return {'success': False, 'file_path': None, 'error': str(e)}
+        logging.exception("Unexpected error locating cached transactions")
+        return {'success': False, 'file_path': None, 'error': 'Failed to read cached transactions.'}
 
 def parse_transaction_file(file_path):
     """Parse transaction file into structured data"""
@@ -236,7 +387,8 @@ def parse_transaction_file(file_path):
 
         return {'success': True, 'transactions': transactions, 'count': len(transactions), 'error': None}
     except Exception as e:
-        return {'success': False, 'transactions': [], 'count': 0, 'error': str(e)}
+        logging.exception("Unexpected error parsing transaction file")
+        return {'success': False, 'transactions': [], 'count': 0, 'error': 'Failed to parse transaction file.'}
 
 
 def cleanup_transaction_file(file_path):
@@ -393,7 +545,7 @@ def load_transactions_or_error(data, default_lookback_days=90):
     load_result = load_transactions_from_request(data, default_lookback_days=default_lookback_days)
     if load_result['success']:
         return load_result, None
-    return None, (jsonify({'error': load_result['error']}), load_result['status_code'])
+    return None, api_error(load_result['error'], load_result['status_code'])
 
 
 # ==================== ROUTES ====================
@@ -435,13 +587,13 @@ def set_plaid_token():
             'stored_at': metadata.get('stored_at'),
         }
         return jsonify(response)
-    except PlaidConfigurationError as e:
-        return jsonify({'error': f'Plaid configuration error: {e}'}), 400
-    except PlaidAccessTokenError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
+    except PlaidConfigurationError:
+        return api_error('Plaid integration is not configured correctly.', 400)
+    except PlaidAccessTokenError:
+        return api_error('Provided Plaid token is invalid for this environment.', 400)
+    except Exception:
         logging.exception("Failed to store Plaid token")
-        return jsonify({'error': f'Failed to store Plaid token: {e}'}), 500
+        return api_error('Failed to store Plaid token.', 500)
 
 
 @app.route('/api/link-token', methods=['POST'])
@@ -451,7 +603,7 @@ def create_link_token_api():
         pipeline = get_bank_pipeline()
     except Exception as exc:
         logging.exception("Unable to initialize Plaid pipeline")
-        return jsonify({'error': str(exc)}), 500
+        return api_error('Unable to initialize Plaid pipeline.', 500)
 
     data = get_request_json()
 
@@ -462,11 +614,11 @@ def create_link_token_api():
     try:
         link_token = pipeline.create_link_token(user_id)
         return jsonify({'link_token': link_token, 'user_id': user_id})
-    except PlaidConfigurationError as exc:
-        return jsonify({'error': f'Plaid configuration error: {exc}'}), 400
-    except Exception as exc:
+    except PlaidConfigurationError:
+        return api_error('Plaid integration is not configured correctly.', 400)
+    except Exception:
         logging.exception("Failed to create Plaid link token")
-        return jsonify({'error': f'Failed to create link token: {exc}'}), 500
+        return api_error('Failed to create link token.', 500)
 
 
 @app.route('/api/models', methods=['GET'])
@@ -487,12 +639,6 @@ def index():
 def tip_page():
     """Finance tip page"""
     return render_template('finance_tip.html')
-
-
-@app.route('/subscriptions')
-def subscriptions_page():
-    """Subscription detection page."""
-    return render_template('subscriptions.html')
 
 
 @app.route('/monthly-spend')
@@ -597,7 +743,8 @@ def get_finance_tip():
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
-        return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
+        logging.exception("Finance tip analysis failed")
+        return api_error('Finance tip analysis failed.', 500)
     finally:
         cleanup_transaction_file(file_path)
 
@@ -642,7 +789,8 @@ def save_email_signup(email, name=None):
             json.dump(signups, f, indent=2)
         return {'success': True}
     except IOError as e:
-        return {'success': False, 'error': f'Failed to save: {str(e)}'}
+        logging.exception("Failed to persist email signup")
+        return {'success': False, 'error': 'Failed to save signup'}
 
 
 @app.route('/api/email-signup', methods=['POST'])
@@ -752,7 +900,11 @@ def monthly_spend_api():
                 use_openai=use_openai,
             )
             if not categorization_result.get('success'):
-                return jsonify({'error': f'Categorization failed: {categorization_result.get("error")}'}), 500
+                logging.warning(
+                    "Monthly spend categorization failed: %s",
+                    categorization_result.get("error"),
+                )
+                return api_error('Transaction categorization failed.', 500)
             categorized_transactions = categorization_result.get('categorized_transactions', [])
 
         categorized_by_transaction_id = {}
@@ -824,6 +976,76 @@ def monthly_spend_api():
             savings_transactions,
             vanguard_sell_inflow_transactions=vanguard_sell_inflow_transactions,
         )
+
+        subscription_summary = {}
+        subscriptions = []
+        selected_month_subscriptions = []
+        subscription_analysis_error = ''
+        if identify_subscriptions:
+            candidate_subscription_transactions = [
+                trx for trx in outflows
+                if not is_savings_allocation(trx) and not is_internal_money_move(trx)
+            ]
+            if not candidate_subscription_transactions:
+                candidate_subscription_transactions = outflows
+
+            subscription_result = identify_subscriptions(candidate_subscription_transactions)
+            if subscription_result.get('success'):
+                subscriptions = subscription_result.get('subscriptions', [])
+                subscription_summary = dict(subscription_result.get('summary', {}))
+
+                selected_month_activity = {}
+                for trx in spend_transactions:
+                    normalized = normalize_subscription_merchant_name(merchant_text(trx))
+                    if not normalized:
+                        continue
+                    raw_amount = abs(float(trx.get('amount') or 0))
+                    existing = selected_month_activity.get(normalized)
+                    trx_date = trx.get('date') or ''
+                    if not existing:
+                        selected_month_activity[normalized] = {
+                            'selected_month_spend_amount': raw_amount,
+                            'selected_month_charge_count': 1,
+                            'selected_month_last_charge_date': trx_date,
+                        }
+                    else:
+                        existing['selected_month_spend_amount'] += raw_amount
+                        existing['selected_month_charge_count'] += 1
+                        if trx_date and trx_date > (existing.get('selected_month_last_charge_date') or ''):
+                            existing['selected_month_last_charge_date'] = trx_date
+
+                for candidate in subscriptions:
+                    normalized = (candidate.get('normalized_merchant') or '').strip().lower()
+                    if not normalized or normalized not in selected_month_activity:
+                        continue
+                    month_metrics = selected_month_activity[normalized]
+                    merged = dict(candidate)
+                    merged['selected_month_spend_amount'] = round(month_metrics['selected_month_spend_amount'], 2)
+                    merged['selected_month_spend_display'] = format_currency(month_metrics['selected_month_spend_amount'])
+                    merged['selected_month_charge_count'] = month_metrics['selected_month_charge_count']
+                    merged['selected_month_last_charge_date'] = month_metrics.get('selected_month_last_charge_date')
+                    selected_month_subscriptions.append(merged)
+
+                selected_month_subscriptions.sort(
+                    key=lambda item: (
+                        item.get('selected_month_spend_amount', 0),
+                        item.get('monthly_cost_estimate', 0),
+                        item.get('confidence_score', 0),
+                    ),
+                    reverse=True,
+                )
+                selected_month_subscriptions_total = round(
+                    sum(item.get('selected_month_spend_amount', 0) for item in selected_month_subscriptions),
+                    2,
+                )
+                subscription_summary['selected_month_subscription_count'] = len(selected_month_subscriptions)
+                subscription_summary['selected_month_spend'] = selected_month_subscriptions_total
+                subscription_summary['selected_month_spend_display'] = format_currency(selected_month_subscriptions_total)
+            else:
+                subscription_analysis_error = subscription_result.get('error') or 'Subscription analysis failed.'
+        else:
+            subscription_analysis_error = 'Subscription analysis is unavailable on this server.'
+
         savings_offset_transactions = [
             {
                 'date': trx.get('date'),
@@ -864,49 +1086,17 @@ def monthly_spend_api():
             'top_category': summary['top_category'],
             'category_breakdown': summary['category_breakdown'],
             'top_merchants': summary['top_merchants'],
+            'subscription_summary': subscription_summary,
+            'subscriptions': subscriptions,
+            'selected_month_subscriptions': selected_month_subscriptions,
+            'subscription_analysis_error': subscription_analysis_error,
             'savings_offset_transactions': savings_offset_transactions,
             'transactions': debug_transactions,
             'timestamp': datetime.now().isoformat(),
         })
     except Exception as exc:
         logging.exception("Monthly spend analysis failed")
-        return jsonify({'error': f'Monthly spend analysis failed: {exc}'}), 500
-    finally:
-        cleanup_transaction_file(file_path)
-
-
-@app.route('/api/subscriptions', methods=['POST'])
-def identify_subscriptions_api():
-    """Identify recurring subscription-like charges from transaction history."""
-    if not identify_subscriptions:
-        return jsonify({'error': 'Subscription analysis is unavailable on this server.'}), 500
-
-    file_path = None
-    try:
-        data = get_request_json()
-        load_result, error_response = load_transactions_or_error(data, default_lookback_days=365)
-        if error_response:
-            return error_response
-
-        file_path = load_result['file_path']
-        lookback_days = load_result['lookback_days']
-        transactions = load_result['transactions']
-
-        analysis_result = identify_subscriptions(transactions)
-        if not analysis_result.get('success'):
-            return jsonify({'error': analysis_result.get('error', 'Subscription analysis failed.')}), 500
-
-        return jsonify({
-            'success': True,
-            'transaction_count': len(transactions),
-            'lookback_days': lookback_days,
-            'subscriptions': analysis_result.get('subscriptions', []),
-            'summary': analysis_result.get('summary', {}),
-            'timestamp': datetime.now().isoformat(),
-        })
-    except Exception as exc:
-        logging.exception("Subscription analysis failed")
-        return jsonify({'error': f'Subscription analysis failed: {exc}'}), 500
+        return api_error('Monthly spend analysis failed.', 500)
     finally:
         cleanup_transaction_file(file_path)
 

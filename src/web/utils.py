@@ -143,6 +143,6 @@ def parse_csv_transactions(csv_content):
             }
         
         return {'success': True, 'transactions': transactions, 'count': len(transactions), 'error': None}
-    except Exception as e:
+    except Exception:
         logging.exception("Error parsing CSV")
-        return {'success': False, 'transactions': [], 'count': 0, 'error': f'CSV parsing error: {str(e)}'}
+        return {'success': False, 'transactions': [], 'count': 0, 'error': 'CSV parsing failed due to an unexpected format error.'}

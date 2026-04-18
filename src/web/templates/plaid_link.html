@@ -319,7 +319,6 @@
       </div>
       <div class="nav-links">
         <a href="/">Insights</a>
-        <a href="/subscriptions">Subscriptions</a>
         <a href="/monthly-spend">Monthly Spend</a>
         <a href="/health">Health</a>
         <a href="/plaid-link" class="active">Connect Bank</a>
@@ -511,7 +510,7 @@
         linkStatus.className = 'status visible success';
         linkStatus.innerHTML = `
           <strong>✓ Successfully connected to ${escapeHtml(institution)}!</strong><br>
-          <span style="font-size: 0.85rem; opacity: 0.9;">You can now use "Fetch fresh data" on the Insights, Subscriptions, or Monthly Spend pages.</span>
+          <span style="font-size: 0.85rem; opacity: 0.9;">You can now use "Fetch fresh data" on the Insights or Monthly Spend pages.</span>
         `;
       } catch (err) {
         linkStatus.className = 'status visible error';
