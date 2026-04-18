@@ -163,6 +163,8 @@ data/plaid_access_tokens.json
 .env
 config.ini
 secrets.json
+src/web/email_signups.json
+/.codex_tmp/
 
 # Database files
 *.db

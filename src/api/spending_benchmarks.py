@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 import json
@@ -82,6 +81,18 @@ def monthly_spend_by_category(transactions: List[Dict[str, Any]]) -> Dict[str, f
     return totals
 
 
+def _categories_for_comparison(
+    user_spend: Dict[str, float],
+    baseline: Optional[Dict[str, float]] = None,
+    categories: Optional[List[str]] = None,
+) -> List[str]:
+    if categories:
+        return categories
+    if baseline:
+        return list(set(list(user_spend.keys()) + list(baseline.keys())))
+    return list(user_spend.keys())
+
+
 def compare_to_benchmarks_rule_of_thumb(user_spend: Dict[str, float], state: Optional[str] = None, categories: Optional[List[str]] = None) -> Dict[str, Any]:
     """Very rough fallback comparison if LLM is unavailable. Uses broad national heuristics only."""
     region = (state or "US").strip().upper()
@@ -92,7 +103,7 @@ def compare_to_benchmarks_rule_of_thumb(user_spend: Dict[str, float], state: Opt
         "groceries": 500.0,
         "utilities": 210.0,
     }
-    cats = categories or list(set(list(user_spend.keys()) + list(baseline.keys())))
+    cats = _categories_for_comparison(user_spend, baseline=baseline, categories=categories)
     comparisons: List[Dict[str, Any]] = []
     for c in cats:
         cat = normalize_category(c)
@@ -132,10 +143,9 @@ def generate_benchmark_comparison_with_llm(user_spend: Dict[str, float], state: 
         return compare_to_benchmarks_rule_of_thumb(user_spend, state=state, categories=categories)
 
     region = (state or "US").strip().upper()
-    cats = categories or list(user_spend.keys())
+    cats = _categories_for_comparison(user_spend, categories=categories)
 
     # Build prompt
-    summary_lines = [f"- {c}: ${user_spend[c]:.2f}" for c in cats]
     user_spend_json = json.dumps({c: round(float(user_spend.get(c, 0.0)), 2) for c in cats})
 
     prompt = f"""
@@ -149,7 +159,7 @@ User monthly spending by category (USD):
 Tasks:
 - For each category, estimate a reasonable average monthly spend for typical households in {region} (or US if state is unknown). If you are uncertain, provide a conservative estimate and set confidence to "low".
 - Compute difference and percent_diff = (user - average) / average * 100.
-- Provide a one‑sentence insight for each category. Keep it neutral and actionable.
+- Provide a one-sentence insight for each category. Keep it neutral and actionable.
 - Create up to 3 short highlight messages only for categories where abs(percent_diff) >= 10.
 - Include a brief disclaimer noting that these are estimates, not advice, and to verify with official sources.
 

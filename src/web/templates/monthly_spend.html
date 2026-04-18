@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monthly Spend</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #0ea5e9;
+      --accent-glow: rgba(14, 165, 233, 0.15);
+      --accent-light: #38bdf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+      gap: 16px;
+      padding: 32px 0 24px;
+    }
+
+    .card,
+    .hero-card,
+    .hero-side {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-label {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-glow);
+      color: var(--accent-light);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 2.1rem;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .hero-side h2,
+    .card-title {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .hero-side ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .source-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .source-tab {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .source-tab:hover { border-color: var(--text-dim); }
+    .source-tab.active { background: var(--accent-glow); border-color: var(--accent); }
+
+    .source-title {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .source-copy {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 10px 12px;
+    }
+
+    .input-group input,
+    .input-group select {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      font-size: 0.9rem;
+      min-width: 120px;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 999px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+    .toggle-label { color: var(--text-muted); }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-drop:hover,
+    .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 12px;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+    }
+
+    .status {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 10px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+    }
+
+    .status.visible { display: flex; }
+    .status.loading { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); }
+    .status.error { background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--error); }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .stat-detail {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin-top: 4px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: var(--accent-glow);
+      color: var(--accent-light);
+    }
+
+    .merchant-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .merchant-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .merchant-name {
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .merchant-value {
+      font-weight: 600;
+      color: var(--accent-light);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    @media (max-width: 900px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .source-tabs,
+      .action-row {
+        flex-direction: column;
+      }
+
+      .action-row .btn,
+      .input-group,
+      .source-tab {
+        width: 100%;
+      }
+
+      .file-info {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">Pluto Finance</div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
+        <a href="/subscriptions">Subscriptions</a>
+        <a href="/monthly-spend" class="active">Monthly Spend</a>
+        <a href="/health">Health</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="hero">
+        <div class="hero-card">
+          <div class="hero-label">Monthly Expenditure</div>
+          <h1>See what you spent in a month and where it went.</h1>
+          <p>
+            Pick a month and get a category-level spend breakdown using the existing categorization feature.
+            Transfers to investment destinations like Vanguard and Gemini are grouped into Savings instead of spend.
+          </p>
+        </div>
+        <div class="hero-side">
+          <h2>What this shows</h2>
+          <ul>
+            <li>Total expenditure for the selected month</li>
+            <li>Total savings transfers in the same month</li>
+            <li>Spend by category and top merchants within each category</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Choose Data Source</h2>
+
+        <div class="source-tabs">
+          <button class="source-tab active" id="tabBank" type="button" onclick="selectSource('bank')">
+            <span class="source-title">Connected Bank</span>
+            <span class="source-copy">Use cached or freshly fetched Plaid data</span>
+          </button>
+          <button class="source-tab" id="tabCsv" type="button" onclick="selectSource('csv')">
+            <span class="source-title">Upload CSV</span>
+            <span class="source-copy">Bring your own export with date, merchant, and amount</span>
+          </button>
+        </div>
+
+        <div id="bankSource">
+          <div class="action-row">
+            <label class="toggle">
+              <input type="checkbox" id="fetchFresh" />
+              <span class="toggle-track"></span>
+              <span class="toggle-label">Fetch fresh data from bank</span>
+            </label>
+            <label class="input-group">
+              <span>Days</span>
+              <input type="number" id="lookback" value="180" min="30" max="365" />
+            </label>
+          </div>
+        </div>
+
+        <div id="csvSource" style="display: none;">
+          <div class="file-drop" id="fileDrop" onclick="document.getElementById('csvInput').click()">
+            <strong>Click to upload</strong> or drag and drop a CSV file.
+            <div class="source-copy" style="margin-top: 8px;">Expected columns include date, amount, and merchant or description.</div>
+          </div>
+          <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
+          <div class="file-info" id="fileInfo">
+            <div>
+              <div id="fileName"></div>
+              <div class="source-copy">CSV loaded and ready for analysis</div>
+            </div>
+            <button class="btn btn-ghost" type="button" onclick="clearFile()">Remove</button>
+          </div>
+        </div>
+
+        <div class="action-row" style="margin-top: 16px;">
+          <label class="toggle">
+            <input type="checkbox" id="useOpenAI" onchange="toggleOpenAI(this.checked)" />
+            <span class="toggle-track"></span>
+            <span class="toggle-label">Use OpenAI (optional)</span>
+          </label>
+          <label class="input-group">
+            <span>Model</span>
+            <select id="modelSelect" onchange="selectedModel=this.value" disabled>
+              <option value="gpt-5-mini">gpt-5-mini</option>
+            </select>
+          </label>
+          <label class="input-group" style="min-width: 260px; flex: 1;">
+            <span>API Key</span>
+            <input type="password" id="openaiApiKey" placeholder="sk-..." disabled />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="action-row">
+          <button class="btn btn-primary" id="analyzeBtn" type="button" onclick="analyzeMonthlySpend()">Analyze Monthly Spend</button>
+          <label class="input-group">
+            <span>Month</span>
+            <select id="monthSelect" onchange="onMonthChange(this.value)" disabled>
+              <option value="">Analyze first</option>
+            </select>
+          </label>
+        </div>
+        <div class="status" id="status">
+          <div class="spinner"></div>
+          <span id="statusText">Analyzing monthly spend...</span>
+        </div>
+      </section>
+
+      <section class="results" id="results">
+        <div class="card">
+          <h2 class="card-title" id="monthHeader">Selected month</h2>
+          <div class="stats-grid" id="statsGrid"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Category Breakdown</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Spend</th>
+                  <th>Share</th>
+                  <th>Transactions</th>
+                  <th>Top Merchants</th>
+                </tr>
+              </thead>
+              <tbody id="categoryTableBody">
+                <tr><td colspan="5"><div class="empty-state">Run the analysis to view category breakdown.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Top Spend Merchants</h2>
+          <div class="merchant-list" id="merchantList"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Debug: Individual Transactions</h2>
+          <div class="source-copy" id="analysisLimitNote" style="margin-bottom: 10px;"></div>
+          <div class="source-copy" id="offsetTransactionsNote" style="margin-bottom: 10px;"></div>
+          <div class="action-row" style="margin-bottom: 12px;">
+            <label class="input-group">
+              <span>Bucket</span>
+              <select id="debugBucketFilter" onchange="applyDebugFilters()">
+                <option value="">All</option>
+                <option value="expenditure">Expenditure</option>
+                <option value="savings">Savings</option>
+                <option value="internal_move">Internal Move</option>
+                <option value="vanguard_sell_inflow">Vanguard Sell Inflow</option>
+                <option value="inflow">Inflow</option>
+              </select>
+            </label>
+            <label class="input-group" style="min-width: 280px; flex: 1;">
+              <span>Search</span>
+              <input id="debugSearchFilter" type="text" placeholder="Merchant, account, category..." oninput="applyDebugFilters()" />
+            </label>
+          </div>
+          <div class="source-copy" id="debugCount" style="margin-bottom: 12px;"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Amount</th>
+                  <th>Bucket</th>
+                  <th>Category</th>
+                  <th>Confidence</th>
+                  <th>Account</th>
+                </tr>
+              </thead>
+              <tbody id="debugTableBody">
+                <tr><td colspan="7"><div class="empty-state">Run the analysis to inspect individual transactions.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let uploadedCsv = null;
+    let currentSource = 'bank';
+    let useOpenAI = false;
+    let selectedModel = 'gpt-5-mini';
+    let allDebugTransactions = [];
+    let filteredDebugTransactions = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupDragDrop();
+      loadModels();
+    });
+
+    async function loadModels() {
+      try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '';
+        (data.models || []).forEach(model => {
+          const option = document.createElement('option');
+          option.value = model;
+          option.textContent = model;
+          if (model === (data.default || 'gpt-5-mini')) {
+            option.selected = true;
+            selectedModel = model;
+          }
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Failed to load models', error);
+      }
+    }
+
+    function toggleOpenAI(checked) {
+      useOpenAI = checked;
+      document.getElementById('modelSelect').disabled = !checked;
+      document.getElementById('openaiApiKey').disabled = !checked;
+    }
+
+    function selectSource(source) {
+      currentSource = source;
+      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
+      document.getElementById('tabCsv').classList.toggle('active', source === 'csv');
+      document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
+      document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
+    }
+
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.remove('dragover');
+        });
+      });
+      drop.addEventListener('drop', event => {
+        const file = event.dataTransfer.files[0];
+        if (file) processFile(file);
+      });
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        showStatus('error', 'Upload a CSV file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = result => {
+        uploadedCsv = result.target.result;
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('visible');
+        document.getElementById('fileDrop').style.display = 'none';
+      };
+      reader.readAsText(file);
+    }
+
+    function clearFile() {
+      uploadedCsv = null;
+      document.getElementById('csvInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('fileDrop').style.display = 'block';
+    }
+
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      status.className = 'status visible ' + type;
+      statusText.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+    }
+
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatMoney(value) {
+      const amount = Number(value || 0);
+      return `$${amount.toFixed(2)}`;
+    }
+
+    function buildPayload(selectedMonth = '') {
+      const payload = {
+        fetch_fresh: document.getElementById('fetchFresh').checked,
+        lookback_days: parseInt(document.getElementById('lookback').value, 10) || 180,
+        use_openai: useOpenAI,
+        openai_api_key: document.getElementById('openaiApiKey').value.trim(),
+        model: useOpenAI ? selectedModel : ''
+      };
+
+      if (selectedMonth) {
+        payload.month = selectedMonth;
+      }
+
+      if (currentSource === 'csv') {
+        if (!uploadedCsv) {
+          throw new Error('Upload a CSV file before analyzing.');
+        }
+        payload.use_csv = true;
+        payload.csv_data = uploadedCsv;
+        payload.fetch_fresh = false;
+      }
+
+      return payload;
+    }
+
+    async function analyzeMonthlySpend(selectedMonth = '') {
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const results = document.getElementById('results');
+
+      analyzeBtn.disabled = true;
+      results.classList.remove('visible');
+      showStatus('loading', 'Analyzing monthly spend...');
+
+      try {
+        const payload = buildPayload(selectedMonth);
+        const response = await fetch('/api/monthly-spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Monthly spend analysis failed.');
+        }
+
+        populateMonthOptions(data.available_months || [], data.selected_month || '');
+        renderResults(data);
+        results.classList.add('visible');
+        hideStatus();
+      } catch (error) {
+        showStatus('error', error.message || 'Monthly spend analysis failed.');
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    }
+
+    function onMonthChange(monthKey) {
+      if (!monthKey) return;
+      analyzeMonthlySpend(monthKey);
+    }
+
+    function populateMonthOptions(months, selectedMonth) {
+      const monthSelect = document.getElementById('monthSelect');
+      monthSelect.innerHTML = '';
+
+      if (!months.length) {
+        monthSelect.innerHTML = '<option value="">No months found</option>';
+        monthSelect.disabled = true;
+        return;
+      }
+
+      months.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.key;
+        option.textContent = item.label;
+        monthSelect.appendChild(option);
+      });
+
+      monthSelect.value = selectedMonth || months[0].key;
+      monthSelect.disabled = false;
+    }
+
+    function renderResults(data) {
+      const statsGrid = document.getElementById('statsGrid');
+      const categoryTableBody = document.getElementById('categoryTableBody');
+      const merchantList = document.getElementById('merchantList');
+      const monthHeader = document.getElementById('monthHeader');
+
+      monthHeader.textContent = `Selected Month: ${escapeHtml(data.selected_month_label || data.selected_month || '')}`;
+
+      const totalExpenditure = data.total_expenditure?.amount || 0;
+      const totalSavings = data.total_savings?.amount || 0;
+      const savingsDisplay = data.total_savings?.display || formatMoney(totalSavings);
+      const grossSavingsDisplay = data.total_savings_gross?.display || formatMoney(data.total_savings_gross?.amount || 0);
+      const vanguardOffsetDisplay = data.vanguard_sell_inflows_offset?.display || formatMoney(data.vanguard_sell_inflows_offset?.amount || 0);
+      const categoryCount = Number(data.category_count || 0);
+      const txCount = Number(data.analyzed_transaction_count || 0);
+      const topCategory = data.top_category || 'None';
+      const vanguardOffsetCount = Number(data.vanguard_sell_inflow_count || 0);
+      const savingsDetail = vanguardOffsetCount
+        ? `${data.savings_transaction_count || 0} savings outflows (${grossSavingsDisplay}) minus ${vanguardOffsetCount} Vanguard Sell inflow(s) (${vanguardOffsetDisplay})`
+        : `${data.savings_transaction_count || 0} investment/savings transfer transactions`;
+
+      statsGrid.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">Expenditure</div>
+          <div class="stat-value">${formatMoney(totalExpenditure)}</div>
+          <div class="stat-detail">${txCount} categorized spend transactions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Savings</div>
+          <div class="stat-value">${escapeHtml(savingsDisplay)}</div>
+          <div class="stat-detail">${escapeHtml(savingsDetail)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Categories</div>
+          <div class="stat-value">${categoryCount}</div>
+          <div class="stat-detail">${categoryCount ? escapeHtml(topCategory) + ' is currently the largest' : 'No spend categories in this month'}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Month Transactions</div>
+          <div class="stat-value">${data.month_transaction_count || data.month_outflow_count || 0}</div>
+          <div class="stat-detail">All transactions in the selected month</div>
+        </div>
+      `;
+
+      const breakdown = Array.isArray(data.category_breakdown) ? data.category_breakdown : [];
+      if (!breakdown.length) {
+        categoryTableBody.innerHTML = '<tr><td colspan="5"><div class="empty-state">No categorized spending found for this month.</div></td></tr>';
+      } else {
+        categoryTableBody.innerHTML = breakdown.map(item => {
+          const merchantNames = (item.top_merchants || []).map(m => escapeHtml(m.name)).join(', ');
+          return `
+            <tr>
+              <td><span class="chip">${escapeHtml(item.category || 'Other')}</span></td>
+              <td>${escapeHtml(item.total?.display || formatMoney(item.total?.amount || 0))}</td>
+              <td>${Number(item.share_percent || 0).toFixed(1)}%</td>
+              <td>${item.transaction_count || 0}</td>
+              <td>${merchantNames || 'n/a'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      const merchants = Array.isArray(data.top_merchants) ? data.top_merchants : [];
+      if (!merchants.length) {
+        merchantList.innerHTML = '<div class="empty-state">No merchant spend data for this month.</div>';
+      } else {
+        merchantList.innerHTML = merchants.map(item => `
+          <div class="merchant-card">
+            <div class="merchant-name">${escapeHtml(item.name || 'Unknown merchant')}</div>
+            <div class="merchant-value">${escapeHtml(item.display || formatMoney(item.amount || 0))}</div>
+          </div>
+        `).join('');
+      }
+
+      allDebugTransactions = Array.isArray(data.transactions) ? data.transactions : [];
+      filteredDebugTransactions = [...allDebugTransactions];
+      const analysisLimitNote = document.getElementById('analysisLimitNote');
+      const offsetTransactionsNote = document.getElementById('offsetTransactionsNote');
+      if (data.analysis_limited) {
+        analysisLimitNote.textContent = `Note: categorization analyzed ${data.analyzed_transaction_count || 0} of ${data.spend_transaction_count || 0} expenditure transactions. Unanalyzed expenditure rows are marked as Uncategorized.`;
+      } else {
+        analysisLimitNote.textContent = '';
+      }
+      const offsetItems = Array.isArray(data.savings_offset_transactions) ? data.savings_offset_transactions : [];
+      if (offsetItems.length) {
+        offsetTransactionsNote.textContent = `Savings offset list (${offsetItems.length}): ${offsetItems.map(item => `${item.date || 'n/a'} ${item.merchant || 'Unknown'} ${item.display || ''}`).join(' | ')}`;
+      } else {
+        offsetTransactionsNote.textContent = 'Savings offset list: none matched.';
+      }
+      applyDebugFilters();
+    }
+
+    function bucketLabel(bucket) {
+      if (bucket === 'expenditure') return 'Expenditure';
+      if (bucket === 'savings') return 'Savings';
+      if (bucket === 'internal_move') return 'Internal Move';
+      if (bucket === 'vanguard_sell_inflow') return 'Vanguard Sell Inflow';
+      if (bucket === 'inflow') return 'Inflow';
+      return bucket || 'Unknown';
+    }
+
+    function applyDebugFilters() {
+      const bucketFilter = document.getElementById('debugBucketFilter').value;
+      const search = document.getElementById('debugSearchFilter').value.trim().toLowerCase();
+
+      filteredDebugTransactions = allDebugTransactions.filter(item => {
+        const matchesBucket = !bucketFilter || item.bucket === bucketFilter;
+        const haystack = [
+          item.merchant || '',
+          item.account_name || '',
+          item.category || '',
+          item.subcategory || '',
+          item.bucket || '',
+          item.bucket_reason || '',
+        ].join(' ').toLowerCase();
+        const matchesSearch = !search || haystack.includes(search);
+        return matchesBucket && matchesSearch;
+      });
+
+      renderDebugTransactions();
+    }
+
+    function renderDebugTransactions() {
+      const debugCount = document.getElementById('debugCount');
+      const debugTableBody = document.getElementById('debugTableBody');
+      debugCount.textContent = `Showing ${filteredDebugTransactions.length} of ${allDebugTransactions.length} monthly transactions`;
+
+      if (!filteredDebugTransactions.length) {
+        debugTableBody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No transactions match current debug filters.</div></td></tr>';
+        return;
+      }
+
+      debugTableBody.innerHTML = filteredDebugTransactions.map(item => `
+        <tr>
+          <td>${escapeHtml(item.date || '')}</td>
+          <td>${escapeHtml(item.merchant || 'Unknown')}</td>
+          <td>${escapeHtml(item.amount_display || formatMoney(item.amount || 0))}</td>
+          <td><span class="chip">${escapeHtml(bucketLabel(item.bucket))}</span></td>
+          <td>
+            ${escapeHtml(item.category || 'n/a')}
+            ${item.subcategory ? `<br><small style="color:var(--text-muted)">${escapeHtml(item.subcategory)}</small>` : ''}
+          </td>
+          <td>${escapeHtml(item.confidence || 'n/a')}</td>
+          <td>${escapeHtml(item.account_name || 'n/a')}</td>
+        </tr>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

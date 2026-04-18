@@ -7,3 +7,4 @@ openai==0.28.1
 Werkzeug==2.3.7
 plaid-python==9.1.0
 python-dotenv==1.0.0 
+defusedxml==0.7.1

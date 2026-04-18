@@ -1,0 +1,1014 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subscriptions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-light: #818cf8;
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+      gap: 16px;
+      padding: 32px 0 24px;
+    }
+
+    .card,
+    .hero-card,
+    .hero-side {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-label {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-glow);
+      color: var(--accent-light);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 2.1rem;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .hero-side h2,
+    .card-title {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .hero-side ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .source-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .source-tab {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .source-tab:hover { border-color: var(--text-dim); }
+
+    .source-tab.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .source-title {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .source-copy {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .action-row,
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .input-group,
+    .filter-bar select,
+    .filter-bar input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 10px 12px;
+    }
+
+    .input-group input,
+    .filter-bar select,
+    .filter-bar input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .filter-bar input {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 999px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    .toggle-label { color: var(--text-muted); }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-drop:hover,
+    .file-drop.dragover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 12px;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:disabled,
+    .btn-secondary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+    }
+
+    .status {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 10px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+    }
+
+    .status.visible { display: flex; }
+    .status.loading { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); }
+    .status.error { background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--error); }
+    .status.success { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--success); }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .stat-detail {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin-top: 4px;
+    }
+
+    .review-note {
+      margin-top: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.18);
+      color: var(--warning);
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .result-count {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-bottom: 12px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .subscription-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a24 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .subscription-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+    }
+
+    .subscription-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .subscription-name {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+    }
+
+    .sub-copy {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-high { background: rgba(16, 185, 129, 0.16); color: var(--success); }
+    .badge-medium { background: rgba(245, 158, 11, 0.16); color: var(--warning); }
+    .badge-low { background: rgba(239, 68, 68, 0.16); color: var(--error); }
+    .badge-cadence { background: var(--accent-glow); color: var(--accent-light); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      padding: 12px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+
+    .metric-label {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .history-title {
+      margin: 0 0 10px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .history-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .history-item:first-child { border-top: none; }
+    .history-amount { font-weight: 600; }
+    .history-account { color: var(--text-muted); font-size: 0.82rem; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    @media (max-width: 900px) {
+      nav { padding: 12px 16px; }
+      main { padding: 0 16px 40px; }
+      .hero { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .source-tabs,
+      .action-row,
+      .filter-bar {
+        flex-direction: column;
+      }
+
+      .action-row .btn,
+      .filter-bar select,
+      .filter-bar input,
+      .source-tab {
+        width: 100%;
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .file-info {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">Pluto Finance</div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
+        <a href="/subscriptions" class="active">Subscriptions</a>
+        <a href="/monthly-spend">Monthly Spend</a>
+        <a href="/health">Health</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="hero">
+        <div class="hero-card">
+          <div class="hero-label">Recurring Charges</div>
+          <h1>Identify subscription spend before it hides in the noise.</h1>
+          <p>
+            This tab scans your transaction history for recurring charges that look like subscriptions,
+            memberships, or other repeat merchant bills. It highlights the likely cadence, the estimated
+            monthly impact, and the exact transactions behind each result.
+          </p>
+        </div>
+        <div class="hero-side">
+          <h2>What this looks for</h2>
+          <ul>
+            <li>Repeat charges from the same merchant</li>
+            <li>Stable amounts on weekly, monthly, quarterly, or yearly cadence</li>
+            <li>Common subscription merchants such as streaming, software, and memberships</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Choose Data Source</h2>
+
+        <div class="source-tabs">
+          <button class="source-tab active" id="tabBank" type="button" onclick="selectSource('bank')">
+            <span class="source-title">Connected Bank</span>
+            <span class="source-copy">Use cached or freshly fetched Plaid data</span>
+          </button>
+          <button class="source-tab" id="tabCsv" type="button" onclick="selectSource('csv')">
+            <span class="source-title">Upload CSV</span>
+            <span class="source-copy">Bring your own export with date, merchant, and amount</span>
+          </button>
+        </div>
+
+        <div id="bankSource">
+          <div class="action-row">
+            <label class="toggle">
+              <input type="checkbox" id="fetchFresh" />
+              <span class="toggle-track"></span>
+              <span class="toggle-label">Fetch fresh data from bank</span>
+            </label>
+            <label class="input-group">
+              <span>Days</span>
+              <input type="number" id="lookback" value="365" min="30" max="365" />
+            </label>
+          </div>
+        </div>
+
+        <div id="csvSource" style="display: none;">
+          <div class="file-drop" id="fileDrop" onclick="document.getElementById('csvInput').click()">
+            <strong>Click to upload</strong> or drag and drop a CSV file.
+            <div class="sub-copy" style="margin-top: 8px;">Expected columns include date, amount, and merchant or description.</div>
+          </div>
+          <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
+          <div class="file-info" id="fileInfo">
+            <div>
+              <div id="fileName"></div>
+              <div class="sub-copy">CSV loaded and ready for analysis</div>
+            </div>
+            <button class="btn btn-ghost" type="button" onclick="clearFile()">Remove</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="action-row">
+          <button class="btn btn-primary" id="analyzeBtn" type="button" onclick="analyzeSubscriptions()">Find Subscriptions</button>
+          <button class="btn btn-secondary" id="exportCsvBtn" type="button" onclick="exportToCsv()" disabled>Export CSV</button>
+          <button class="btn btn-secondary" id="exportJsonBtn" type="button" onclick="exportToJson()" disabled>Export JSON</button>
+        </div>
+        <div class="status" id="status">
+          <div class="spinner"></div>
+          <span id="statusText">Scanning transactions for recurring charges...</span>
+        </div>
+      </section>
+
+      <section class="results" id="results">
+        <div class="card">
+          <div class="stats-grid" id="statsGrid"></div>
+          <div class="review-note">
+            Review each result before canceling anything. This feature detects recurring charges, which can include true subscriptions,
+            annual renewals, and some repeat bills from the same merchant.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="filter-bar">
+            <select id="confidenceFilter" onchange="applyFilters()">
+              <option value="">All confidence levels</option>
+              <option value="high">High confidence</option>
+              <option value="medium">Medium confidence</option>
+              <option value="low">Low confidence</option>
+            </select>
+            <input id="searchFilter" type="text" placeholder="Search merchants" oninput="applyFilters()" />
+          </div>
+          <div class="result-count" id="resultCount"></div>
+          <div class="cards-grid" id="subscriptionsGrid"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let uploadedCsv = null;
+    let currentSource = 'bank';
+    let allSubscriptions = [];
+    let filteredSubscriptions = [];
+
+    document.addEventListener('DOMContentLoaded', setupDragDrop);
+
+    function selectSource(source) {
+      currentSource = source;
+      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
+      document.getElementById('tabCsv').classList.toggle('active', source === 'csv');
+      document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
+      document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
+    }
+
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        drop.addEventListener(eventName, event => {
+          event.preventDefault();
+          drop.classList.remove('dragover');
+        });
+      });
+      drop.addEventListener('drop', event => {
+        const file = event.dataTransfer.files[0];
+        if (file) processFile(file);
+      });
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        showStatus('error', 'Upload a CSV file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = result => {
+        uploadedCsv = result.target.result;
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('visible');
+        document.getElementById('fileDrop').style.display = 'none';
+      };
+      reader.readAsText(file);
+    }
+
+    function clearFile() {
+      uploadedCsv = null;
+      document.getElementById('csvInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+      document.getElementById('fileDrop').style.display = 'block';
+    }
+
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      status.className = 'status visible ' + type;
+      statusText.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+    }
+
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatMoney(value) {
+      const amount = Number(value || 0);
+      return `$${amount.toFixed(2)}`;
+    }
+
+    async function analyzeSubscriptions() {
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const exportCsvBtn = document.getElementById('exportCsvBtn');
+      const exportJsonBtn = document.getElementById('exportJsonBtn');
+      const results = document.getElementById('results');
+
+      analyzeBtn.disabled = true;
+      exportCsvBtn.disabled = true;
+      exportJsonBtn.disabled = true;
+      results.classList.remove('visible');
+      showStatus('loading', 'Scanning transactions for recurring charges...');
+
+      try {
+        const payload = {
+          fetch_fresh: document.getElementById('fetchFresh').checked,
+          lookback_days: parseInt(document.getElementById('lookback').value, 10) || 365
+        };
+
+        if (currentSource === 'csv') {
+          if (!uploadedCsv) {
+            throw new Error('Upload a CSV file before running subscription detection.');
+          }
+          payload.use_csv = true;
+          payload.csv_data = uploadedCsv;
+          payload.fetch_fresh = false;
+        }
+
+        const response = await fetch('/api/subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Subscription analysis failed.');
+        }
+
+        allSubscriptions = Array.isArray(data.subscriptions) ? data.subscriptions : [];
+        filteredSubscriptions = [...allSubscriptions];
+
+        renderSummary(data.summary || {});
+        applyFilters();
+        results.classList.add('visible');
+        hideStatus();
+        exportCsvBtn.disabled = allSubscriptions.length === 0;
+        exportJsonBtn.disabled = allSubscriptions.length === 0;
+      } catch (error) {
+        showStatus('error', error.message || 'Subscription analysis failed.');
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    }
+
+    function renderSummary(summary) {
+      const statsGrid = document.getElementById('statsGrid');
+      const total = Number(summary.total_subscriptions || 0);
+      const high = Number(summary.high_confidence_count || 0);
+      const medium = Number(summary.medium_confidence_count || 0);
+      const monthly = Number(summary.total_monthly_spend || 0);
+      const annual = Number(summary.total_annual_spend || 0);
+
+      statsGrid.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">Subscriptions</div>
+          <div class="stat-value">${total}</div>
+          <div class="stat-detail">Recurring charges detected in the selected window</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monthly Estimate</div>
+          <div class="stat-value">${formatMoney(monthly)}</div>
+          <div class="stat-detail">Estimated recurring monthly impact</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Annual Estimate</div>
+          <div class="stat-value">${formatMoney(annual)}</div>
+          <div class="stat-detail">Estimated yearly cost if all remain active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Needs Less Review</div>
+          <div class="stat-value">${high}</div>
+          <div class="stat-detail">High confidence matches, plus ${medium} medium confidence</div>
+        </div>
+      `;
+    }
+
+    function applyFilters() {
+      const confidence = document.getElementById('confidenceFilter').value;
+      const search = document.getElementById('searchFilter').value.trim().toLowerCase();
+
+      filteredSubscriptions = allSubscriptions.filter(item => {
+        const matchesConfidence = !confidence || item.confidence === confidence;
+        const merchant = String(item.merchant || '').toLowerCase();
+        const reason = String(item.reason || '').toLowerCase();
+        const cadence = String(item.cadence || '').toLowerCase();
+        const matchesSearch = !search || merchant.includes(search) || reason.includes(search) || cadence.includes(search);
+        return matchesConfidence && matchesSearch;
+      });
+
+      renderSubscriptions();
+    }
+
+    function renderSubscriptions() {
+      const resultCount = document.getElementById('resultCount');
+      const subscriptionsGrid = document.getElementById('subscriptionsGrid');
+
+      resultCount.textContent = `Showing ${filteredSubscriptions.length} of ${allSubscriptions.length} detected recurring charges`;
+
+      if (filteredSubscriptions.length === 0) {
+        subscriptionsGrid.innerHTML = '<div class="empty-state">No subscription matches found for the current filters.</div>';
+        return;
+      }
+
+      subscriptionsGrid.innerHTML = filteredSubscriptions.map(item => {
+        const confidenceClass = `badge-${escapeHtml(item.confidence || 'low')}`;
+        const history = Array.isArray(item.recent_transactions) ? item.recent_transactions : [];
+        const nextDate = item.next_estimated_charge_date ? escapeHtml(item.next_estimated_charge_date) : 'Unknown';
+
+        return `
+          <article class="subscription-card">
+            <div class="subscription-head">
+              <div>
+                <h3 class="subscription-name">${escapeHtml(item.merchant || 'Unknown merchant')}</h3>
+                <div class="sub-copy">${escapeHtml(item.reason || 'Recurring activity detected.')}</div>
+              </div>
+              <div class="sub-copy">Score ${escapeHtml(item.confidence_score || 0)}</div>
+            </div>
+
+            <div class="badge-row">
+              <span class="badge ${confidenceClass}">${escapeHtml(item.confidence || 'low')} confidence</span>
+              <span class="badge badge-cadence">${escapeHtml(item.cadence || 'irregular')}</span>
+            </div>
+
+            <div class="metric-grid">
+              <div class="metric">
+                <div class="metric-label">Monthly Cost</div>
+                <div class="metric-value">${formatMoney(item.monthly_cost_estimate)}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Annual Cost</div>
+                <div class="metric-value">${formatMoney(item.annual_cost_estimate)}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Last Charge</div>
+                <div class="metric-value">${escapeHtml(item.last_charge_date || 'Unknown')}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Next Estimated</div>
+                <div class="metric-value">${nextDate}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Average Charge</div>
+                <div class="metric-value">${formatMoney(item.average_amount)}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Occurrences</div>
+                <div class="metric-value">${escapeHtml(item.occurrences || 0)}</div>
+              </div>
+            </div>
+
+            <h4 class="history-title">Recent charges</h4>
+            <ul class="history-list">
+              ${history.map(trx => `
+                <li class="history-item">
+                  <div>
+                    <div>${escapeHtml(trx.date || 'Unknown')}</div>
+                    <div class="history-account">${escapeHtml(trx.account_name || 'Unknown account')}</div>
+                  </div>
+                  <div class="history-amount">${formatMoney(trx.amount)}</div>
+                </li>
+              `).join('')}
+            </ul>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function downloadFile(content, type, filename) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportToCsv() {
+      if (!allSubscriptions.length) return;
+      const rows = [
+        ['Merchant', 'Confidence', 'Score', 'Cadence', 'Monthly Cost', 'Annual Cost', 'Average Amount', 'Last Charge', 'Next Estimated', 'Occurrences', 'Reason']
+      ];
+
+      allSubscriptions.forEach(item => {
+        rows.push([
+          item.merchant || '',
+          item.confidence || '',
+          item.confidence_score || 0,
+          item.cadence || '',
+          item.monthly_cost_estimate || 0,
+          item.annual_cost_estimate || 0,
+          item.average_amount || 0,
+          item.last_charge_date || '',
+          item.next_estimated_charge_date || '',
+          item.occurrences || 0,
+          item.reason || ''
+        ]);
+      });
+
+      const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+      downloadFile(csv, 'text/csv', `subscriptions_${new Date().toISOString().split('T')[0]}.csv`);
+    }
+
+    function exportToJson() {
+      if (!allSubscriptions.length) return;
+      downloadFile(JSON.stringify(allSubscriptions, null, 2), 'application/json', `subscriptions_${new Date().toISOString().split('T')[0]}.json`);
+    }
+  </script>
+</body>
+</html>
+

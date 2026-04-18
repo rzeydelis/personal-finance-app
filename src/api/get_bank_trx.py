@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 ACCESS_TOKEN_PATTERN = re.compile(r"^access-(sandbox|development|production)-[A-Za-z0-9-]+$")
+DEFAULT_LOOKBACK_DAYS = 90
+PLAID_ENVIRONMENT_MAP = {
+    "sandbox": plaid.Environment.Sandbox,
+    "development": plaid.Environment.Sandbox,  # Development maps to sandbox for most workflows
+    "production": plaid.Environment.Production,
+}
 
 
 class PlaidConfigurationError(RuntimeError):
@@ -46,6 +52,17 @@ class PlaidAccessTokenError(RuntimeError):
 class PlaidCredentials:
     client: plaid_api.PlaidApi
     environment: str
+
+
+def _utc_now() -> datetime:
+    return datetime.utcnow()
+
+
+def _read_csv_env(var_name: str, *, lowercase: bool = False) -> List[str]:
+    values = [value.strip() for value in (os.getenv(var_name) or "").split(",") if value.strip()]
+    if lowercase:
+        return [value.lower() for value in values]
+    return values
 
 
 def project_root() -> Path:
@@ -75,6 +92,11 @@ def write_token_store(data: Dict[str, Any], path: Optional[Path] = None) -> None
     target = Path(path) if path else default_token_store_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(data, indent=2, sort_keys=True))
+    try:
+        # Restrict token file readability on POSIX systems when possible.
+        os.chmod(target, 0o600)
+    except Exception:
+        pass
 
 
 def store_access_token(
@@ -94,9 +116,10 @@ def store_access_token(
             "Provided access token is invalid. Expected format: access-<environment>-<identifier>"
         )
 
+    now = _utc_now()
     resolved_item_id = (item_id or os.getenv("PLAID_ITEM_ID") or "").strip() or None
     if not resolved_item_id:
-        resolved_item_id = f"manual_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        resolved_item_id = f"manual_{now.strftime('%Y%m%d%H%M%S')}"
 
     store = read_token_store(token_store_path)
     items = store.setdefault("items", {})
@@ -105,10 +128,10 @@ def store_access_token(
     item_metadata = store.setdefault("item_metadata", {})
     item_metadata[resolved_item_id] = {
         "source": source,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now.isoformat(),
     }
 
-    store["last_updated"] = datetime.utcnow().isoformat()
+    store["last_updated"] = now.isoformat()
     store["last_item_id"] = resolved_item_id
     write_token_store(store, token_store_path)
 
@@ -166,13 +189,7 @@ def create_plaid_client() -> PlaidCredentials:
             "in your environment or .env file."
         )
 
-    env_mapping = {
-        "sandbox": plaid.Environment.Sandbox,
-        "development": plaid.Environment.Sandbox,  # Development maps to sandbox for most workflows
-        "production": plaid.Environment.Production,
-    }
-
-    plaid_env = env_mapping.get(env_name)
+    plaid_env = PLAID_ENVIRONMENT_MAP.get(env_name)
     if plaid_env is None:
         raise PlaidConfigurationError(
             f"Unsupported PLAID_ENV '{env_name}'. Valid options: sandbox, development, production."
@@ -244,16 +261,11 @@ def resolve_access_token(
     elif env_token:
         logger.warning("PLAID_ACCESS_TOKEN is set but not a valid Plaid access token format.")
 
-    csv_tokens = os.getenv("PLAID_ACCESS_TOKENS")
-    if csv_tokens:
-        for raw in csv_tokens.split(","):
-            token = raw.strip()
-            if not token:
-                continue
-            if is_valid_access_token(token):
-                candidates.append((token, None, "PLAID_ACCESS_TOKENS"))
-            else:
-                logger.warning("Ignoring token that does not match Plaid format from PLAID_ACCESS_TOKENS.")
+    for token in _read_csv_env("PLAID_ACCESS_TOKENS"):
+        if is_valid_access_token(token):
+            candidates.append((token, None, "PLAID_ACCESS_TOKENS"))
+        else:
+            logger.warning("Ignoring token that does not match Plaid format from PLAID_ACCESS_TOKENS.")
 
     store = read_token_store(token_store_path)
     for item_id, token in (store.get("items") or {}).items():
@@ -295,18 +307,15 @@ def determine_date_range(
     end_date: Optional[date] = None,
 ) -> Tuple[date, date]:
     """Compute a valid date range for the transaction query."""
-    if start_date and end_date:
-        pass
-    elif start_date:
-        end_date = datetime.today().date()
-    elif end_date:
-        start_date = end_date - timedelta(days=days_back or 90)
-    else:
-        end_date = datetime.today().date()
-        start_date = end_date - timedelta(days=days_back or 90)
-
-    if start_date is None or end_date is None:
-        raise ValueError("Unable to determine date range.")
+    lookback_days = days_back or DEFAULT_LOOKBACK_DAYS
+    today = datetime.today().date()
+    if start_date is None and end_date is None:
+        end_date = today
+        start_date = end_date - timedelta(days=lookback_days)
+    elif start_date is None:
+        start_date = end_date - timedelta(days=lookback_days)
+    elif end_date is None:
+        end_date = today
 
     if start_date > end_date:
         raise ValueError("Start date must be on or before end date.")
@@ -316,18 +325,10 @@ def determine_date_range(
 
 def build_account_filters() -> Dict[str, List[str]]:
     """Read optional account filtering configuration from environment variables."""
-    account_ids = [x.strip() for x in (os.getenv("PLAID_ACCOUNT_IDS") or "").split(",") if x.strip()]
-    account_name_keywords = [
-        x.strip().lower() for x in (os.getenv("PLAID_ACCOUNT_NAME_FILTER") or "").split(",") if x.strip()
-    ]
-    account_subtypes = [
-        x.strip().lower() for x in (os.getenv("PLAID_ACCOUNT_SUBTYPES") or "").split(",") if x.strip()
-    ]
-
     return {
-        "account_ids": account_ids,
-        "account_name_keywords": account_name_keywords,
-        "account_subtypes": account_subtypes,
+        "account_ids": _read_csv_env("PLAID_ACCOUNT_IDS"),
+        "account_name_keywords": _read_csv_env("PLAID_ACCOUNT_NAME_FILTER", lowercase=True),
+        "account_subtypes": _read_csv_env("PLAID_ACCOUNT_SUBTYPES", lowercase=True),
     }
 
 
@@ -548,10 +549,7 @@ def cli(argv: Optional[List[str]] = None) -> int:
             result["file_path"],
         )
         return 0
-    except (PlaidConfigurationError, PlaidAccessTokenError, ValueError) as exc:
-        logger.error("%s", exc)
-        return 1
-    except RuntimeError as exc:
+    except (PlaidConfigurationError, PlaidAccessTokenError, ValueError, RuntimeError) as exc:
         logger.error("%s", exc)
         return 1
 

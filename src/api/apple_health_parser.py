@@ -3,7 +3,11 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, IO, Iterable, Optional, Tuple, Union
-import xml.etree.ElementTree as ET
+
+try:
+    from defusedxml import ElementTree as ET
+except Exception:
+    import xml.etree.ElementTree as ET
 
 
 APPLE_HEALTH_DATE_FORMATS = (

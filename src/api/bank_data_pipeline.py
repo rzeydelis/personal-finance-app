@@ -61,6 +61,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+DEFAULT_LINK_USER_ID = "demo_user_123"
 
 
 class BankDataPipeline:
@@ -269,15 +270,16 @@ class BankDataPipeline:
         """
         Complete pipeline: (optionally) exchange token, fetch transactions, format output.
         """
-        metadata: Optional[Dict[str, Any]] = None
+        resolved_item_id = item_id
         if public_token:
             metadata = self.exchange_public_token(public_token, item_id=item_id)
-        elif access_token:
-            metadata = self.store_access_token(access_token, item_id=item_id, source="manual")
+            resolved_item_id = metadata.get("item_id") or item_id
 
-        item_hint = (metadata or {}).get("item_id") or item_id
-
-        transactions_summary = self.get_transactions(days_back=days_back, item_id=item_hint)
+        transactions_summary = self.get_transactions(
+            days_back=days_back,
+            item_id=resolved_item_id,
+            access_token=access_token if not public_token else None,
+        )
         formatted_data, file_extension = self.format_transactions_for_download(
             transactions_summary["transactions"],
             format_type=format_type,
@@ -303,7 +305,7 @@ class BankDataPipeline:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Plaid one-click bank data pipeline.")
-    parser.add_argument("--link", nargs="?", const="demo_user_123", help="Create a Plaid link token for the given user id.")
+    parser.add_argument("--link", nargs="?", const=DEFAULT_LINK_USER_ID, help="Create a Plaid link token for the given user id.")
     parser.add_argument("--exchange", help="Exchange a Plaid public token for an access token.")
     parser.add_argument("--store-access", dest="store_access", help="Store a Plaid access token manually.")
     parser.add_argument("--item-id", help="Override item id when storing or downloading.")
@@ -333,7 +335,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if not tasks:
         # Default legacy behaviour: create a link token.
-        args.link = "demo_user_123"
+        args.link = DEFAULT_LINK_USER_ID
         tasks.append("link")
 
     if len(tasks) > 1:
@@ -343,7 +345,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         if tasks[0] == "link":
-            user_id = args.link or "demo_user_123"
+            user_id = args.link or DEFAULT_LINK_USER_ID
             token = pipeline.create_link_token(user_id)
             print(f"Link token for user '{user_id}':\n{token}")
             return 0
@@ -359,17 +361,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
 
         if tasks[0] == "download":
-            metadata: Optional[Dict[str, Any]] = None
-            if args.public_token:
-                metadata = pipeline.exchange_public_token(args.public_token, item_id=args.item_id)
-            elif args.access_token:
-                metadata = pipeline.store_access_token(args.access_token, item_id=args.item_id, source="manual")
-
             result = pipeline.one_click_download(
                 user_id="cli_user",
                 days_back=args.days,
                 format_type=args.format,
-                item_id=(metadata or {}).get("item_id") or args.item_id,
+                public_token=args.public_token,
+                access_token=args.access_token,
+                item_id=args.item_id,
             )
 
             if args.output:

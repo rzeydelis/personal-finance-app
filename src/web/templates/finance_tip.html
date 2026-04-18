@@ -429,68 +429,325 @@
     .file-info .file-status { color: var(--success); font-size: 0.85rem; }
 
     /* Results section */
-    .results { display: none; }
-    .results.visible { display: block; }
+    .results { display: none; margin-bottom: 28px; }
+    .results.visible { display: grid; gap: 16px; }
 
-    .tip-card {
-      background: linear-gradient(135deg, var(--bg-card) 0%, #1a1a24 100%);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+    .results-hero {
+      background:
+        radial-gradient(circle at top left, rgba(129, 140, 248, 0.2), transparent 36%),
+        linear-gradient(135deg, #191926 0%, #12121a 60%, #101017 100%);
+      border: 1px solid rgba(129, 140, 248, 0.18);
+      border-radius: 24px;
       padding: 28px;
       position: relative;
       overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
     }
 
-    .tip-card::before {
+    .results-hero::before {
       content: '';
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--accent), var(--accent-light), var(--success));
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .results-topline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.14);
+      border: 1px solid rgba(129, 140, 248, 0.22);
+      color: var(--accent-light);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 18px;
+      max-width: 100%;
+      white-space: normal;
+    }
+
+    .results-hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+      gap: 20px;
+      align-items: stretch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .tip-card {
+      background: rgba(15, 15, 18, 0.64);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
     }
 
     .tip-header {
       display: flex;
       align-items: flex-start;
       gap: 16px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .tip-icon {
-      width: 48px;
-      height: 48px;
-      background: var(--accent-glow);
-      border-radius: 12px;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.24), rgba(16, 185, 129, 0.16));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--text);
       flex-shrink: 0;
     }
 
+    .tip-kicker {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+      margin: 0 0 8px;
+    }
+
     .tip-title {
-      font-size: 1.25rem;
+      font-size: clamp(1.5rem, 3vw, 2.6rem);
+      line-height: 1.04;
       font-weight: 700;
-      margin: 0 0 4px;
+      margin: 0 0 10px;
+      max-width: 12ch;
+    }
+
+    .tip-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .tip-savings,
+    .tip-why {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      max-width: 100%;
+      white-space: normal;
     }
 
     .tip-savings {
-      display: inline-block;
       background: rgba(16, 185, 129, 0.15);
       color: var(--success);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 600;
+      border: 1px solid rgba(16, 185, 129, 0.24);
+    }
+
+    .tip-why {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .tip-advice {
       font-size: 1rem;
-      line-height: 1.6;
+      line-height: 1.7;
       color: var(--text);
-      margin-bottom: 20px;
+      margin: 0;
+    }
+
+    .summary-panel {
+      background: linear-gradient(160deg, rgba(99, 102, 241, 0.14), rgba(6, 182, 212, 0.08));
+      border: 1px solid rgba(129, 140, 248, 0.18);
+      border-radius: 20px;
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .summary-label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.72rem;
+    }
+
+    .summary-metric {
+      display: grid;
+      gap: 4px;
+    }
+
+    .summary-value {
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 0.95;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .summary-caption {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .shock-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .shock-card {
+      background: rgba(15, 15, 18, 0.66);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 108px;
+    }
+
+    .shock-card-label {
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 10px;
+    }
+
+    .shock-card-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .shock-card-caption {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .story-grid,
+    .insights-grid,
+    .lists-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .story-grid,
+    .insights-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .lists-grid {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .insight-card,
+    .story-card,
+    .list-panel,
+    .steps-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+    }
+
+    .story-card-eyebrow,
+    .section-heading,
+    .insight-label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.72rem;
+      margin-bottom: 10px;
+    }
+
+    .story-card-title,
+    .insight-value {
+      color: var(--text);
+      font-size: 1rem;
+      line-height: 1.45;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .story-card-detail,
+    .list-empty,
+    .insight-detail {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .list-panel {
+      display: grid;
+      gap: 14px;
+    }
+
+    .list-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .list-header-note {
+      color: var(--text-dim);
+      font-size: 0.8rem;
+    }
+
+    .list-items {
+      display: grid;
+      gap: 10px;
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--bg);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .list-rank {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(99, 102, 241, 0.16);
+      color: var(--accent-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .list-item-title {
+      color: var(--text);
+      font-size: 0.94rem;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .list-item-note {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .list-item-value {
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-align: right;
     }
 
     .steps-section h3 {
@@ -498,7 +755,7 @@
       color: var(--text-muted);
       margin: 0 0 12px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.14em;
     }
 
     .steps-list {
@@ -530,34 +787,7 @@
       flex-shrink: 0;
     }
 
-    .step-text { font-size: 0.95rem; line-height: 1.5; }
-
-    .insights-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-top: 20px;
-    }
-
-    .insight-card {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-    }
-
-    .insight-label {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-
-    .insight-value {
-      font-size: 0.95rem;
-      color: var(--text);
-    }
+    .step-text { font-size: 0.95rem; line-height: 1.55; }
 
     /* LLM Settings */
     .settings-row {
@@ -772,6 +1002,11 @@
       .action-row { flex-direction: column; }
       .action-row .btn { width: 100%; justify-content: center; }
       .source-tabs { flex-direction: column; }
+      .results-hero { padding: 20px; border-radius: 20px; }
+      .results-hero-grid { grid-template-columns: 1fr; }
+      .shock-grid { grid-template-columns: 1fr; }
+      .list-item { grid-template-columns: auto minmax(0, 1fr); }
+      .list-item-value { grid-column: 2; text-align: left; }
       .signup-content { flex-direction: column; gap: 12px; }
       .signup-fields { flex-direction: column; }
       .signup-input { min-width: 100%; }
@@ -787,7 +1022,8 @@
       </div>
       <div class="nav-links">
         <a href="/" class="active">Insights</a>
-        <a href="/categorize">Categorize</a>
+        <a href="/subscriptions">Subscriptions</a>
+        <a href="/monthly-spend">Monthly Spend</a>
         <a href="/health">Health</a>
         <a href="/plaid-link">Connect Bank</a>
       </div>
@@ -795,8 +1031,8 @@
 
     <main>
       <div class="hero">
-        <h1>Get Personalized Finance Tips</h1>
-        <p>AI-powered insights to help you save money and spend smarter</p>
+        <h1>See Where Your Money Hits Hardest</h1>
+        <p>A sharper finance x-ray with real pressure points, monthly swings, and habit loops worth fixing.</p>
       </div>
 
       <!-- Data Source Selection -->
@@ -887,7 +1123,7 @@
       <div class="card">
         <div class="action-row">
           <button class="btn btn-primary" id="generateBtn" onclick="generateTip()">
-            ✨ Generate Finance Tip
+            Generate Mind-Blowing Insights
           </button>
           <button class="btn btn-secondary" id="copyBtn" onclick="copyTip()" disabled>
             📋 Copy
@@ -901,23 +1137,83 @@
 
       <!-- Results -->
       <div class="results" id="results">
-        <div class="tip-card">
-          <div class="tip-header">
-            <div class="tip-icon">💡</div>
-            <div>
-              <h2 class="tip-title" id="tipTitle">Your Finance Tip</h2>
-              <span class="tip-savings" id="tipSavings"></span>
+        <div class="results-hero">
+          <div class="results-topline" id="resultsTopline">Financial X-Ray</div>
+          <div class="results-hero-grid">
+            <div class="tip-card">
+              <div class="tip-header">
+                <div class="tip-icon">XR</div>
+                <div>
+                  <p class="tip-kicker">Your strongest signal</p>
+                  <h2 class="tip-title" id="tipTitle">Your Finance Tip</h2>
+                </div>
+              </div>
+
+              <div class="tip-meta">
+                <span class="tip-savings" id="tipSavings"></span>
+                <span class="tip-why" id="tipWhyNow"></span>
+              </div>
+
+              <p class="tip-advice" id="tipAdvice"></p>
+            </div>
+
+            <div class="summary-panel">
+              <div class="summary-label">Money shockwave</div>
+              <div class="summary-metric">
+                <div class="summary-value" id="summarySpendValue">--</div>
+                <div class="summary-caption" id="summarySpendCaption">Upload data or fetch bank activity to light this up.</div>
+              </div>
+              <div class="shock-grid">
+                <div class="shock-card">
+                  <div class="shock-card-label">Daily burn</div>
+                  <div class="shock-card-value" id="dailyBurnValue">--</div>
+                  <div class="shock-card-caption" id="dailyBurnCaption"></div>
+                </div>
+                <div class="shock-card">
+                  <div class="shock-card-label">Largest hit</div>
+                  <div class="shock-card-value" id="largestHitValue">--</div>
+                  <div class="shock-card-caption" id="largestHitCaption"></div>
+                </div>
+                <div class="shock-card">
+                  <div class="shock-card-label">Peak day</div>
+                  <div class="shock-card-value" id="peakDayValue">--</div>
+                  <div class="shock-card-caption" id="peakDayCaption"></div>
+                </div>
+                <div class="shock-card">
+                  <div class="shock-card-label">Net flow</div>
+                  <div class="shock-card-value" id="netFlowValue">--</div>
+                  <div class="shock-card-caption" id="netFlowCaption"></div>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <p class="tip-advice" id="tipAdvice"></p>
+        </div>
 
-          <div class="steps-section">
-            <h3>Action Steps</h3>
-            <ol class="steps-list" id="stepsList"></ol>
+        <div class="story-grid" id="storyGrid"></div>
+
+        <div class="insights-grid" id="insightsGrid"></div>
+
+        <div class="lists-grid">
+          <div class="list-panel">
+            <div class="list-header">
+              <div class="section-heading">Merchant Gravity</div>
+              <div class="list-header-note">Where your money clusters</div>
+            </div>
+            <div class="list-items" id="merchantList"></div>
           </div>
 
-          <div class="insights-grid" id="insightsGrid"></div>
+          <div class="list-panel">
+            <div class="list-header">
+              <div class="section-heading">Recurring Drag</div>
+              <div class="list-header-note">Repeat charges worth watching</div>
+            </div>
+            <div class="list-items" id="watchlistList"></div>
+          </div>
+        </div>
+
+        <div class="steps-section">
+          <h3>Action Steps</h3>
+          <ol class="steps-list" id="stepsList"></ol>
         </div>
       </div>
 
@@ -1083,6 +1379,187 @@
       document.getElementById('status').classList.remove('visible');
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setElementText(id, value, fallback = '') {
+      const element = document.getElementById(id);
+      element.textContent = value || fallback;
+    }
+
+    function setBadge(id, value) {
+      const element = document.getElementById(id);
+      if (value) {
+        element.textContent = value;
+        element.style.display = 'inline-flex';
+      } else {
+        element.textContent = '';
+        element.style.display = 'none';
+      }
+    }
+
+    function renderStoryCards(summary = {}) {
+      const cards = Array.isArray(summary.story_cards) ? summary.story_cards : [];
+      document.getElementById('storyGrid').innerHTML = cards.map(card => `
+        <div class="story-card">
+          <div class="story-card-eyebrow">${escapeHtml(card.eyebrow || 'Signal')}</div>
+          <div class="story-card-title">${escapeHtml(card.headline || '')}</div>
+          <div class="story-card-detail">${escapeHtml(card.detail || '')}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderInsightCards(insights = {}, summary = {}) {
+      const cards = [];
+
+      if (insights.surprising_pattern) {
+        cards.push({
+          label: 'Unexpected Pattern',
+          value: insights.surprising_pattern,
+          detail: insights.spending_trend || ''
+        });
+      }
+
+      if (summary.monthly_comparison?.available) {
+        cards.push({
+          label: 'Monthly Swing',
+          value: summary.monthly_comparison.summary,
+          detail: `${summary.monthly_comparison.previous_month} ${summary.monthly_comparison.previous_display} -> ${summary.monthly_comparison.current_month} ${summary.monthly_comparison.current_display}`
+        });
+      }
+
+      if (Array.isArray(insights.frequent_merchants) && insights.frequent_merchants.length) {
+        cards.push({
+          label: 'Merchant Loop',
+          value: insights.frequent_merchants.slice(0, 4).join(', '),
+          detail: 'Repeat names are usually where habits or subscriptions hide.'
+        });
+      }
+
+      if (Array.isArray(insights.merchant_watchlist) && insights.merchant_watchlist.length) {
+        const firstWatch = insights.merchant_watchlist[0] || {};
+        cards.push({
+          label: 'Watch This',
+          value: `${firstWatch.merchant || 'Merchant'}: ${firstWatch.note || ''}`.trim(),
+          detail: insights.mind_blown_moment || ''
+        });
+      }
+
+      if ((summary.internal_moves_total?.amount || 0) > 0) {
+        cards.push({
+          label: 'Hidden Weight',
+          value: `${summary.internal_moves_total.display} went to transfers or payments`,
+          detail: 'That helps separate true day-to-day spend from account movement.'
+        });
+      }
+
+      if (!cards.length) {
+        cards.push({
+          label: 'Signal',
+          value: insights.spending_trend || 'The analysis found a pattern, but no extra support cards were returned.',
+          detail: ''
+        });
+      }
+
+      document.getElementById('insightsGrid').innerHTML = cards.slice(0, 4).map(card => `
+        <div class="insight-card">
+          <div class="insight-label">${escapeHtml(card.label || 'Insight')}</div>
+          <div class="insight-value">${escapeHtml(card.value || '')}</div>
+          <div class="insight-detail">${escapeHtml(card.detail || '')}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderMerchantList(items = []) {
+      const target = document.getElementById('merchantList');
+      if (!items.length) {
+        target.innerHTML = '<div class="list-empty">No merchant clusters found yet.</div>';
+        return;
+      }
+
+      target.innerHTML = items.map((item, index) => `
+        <div class="list-item">
+          <div class="list-rank">${index + 1}</div>
+          <div>
+            <div class="list-item-title">${escapeHtml(item.merchant || 'Unknown')}</div>
+            <div class="list-item-note">${escapeHtml(`${item.count || 0} hits | ${item.share_percent || 0}% of spend`)}</div>
+          </div>
+          <div class="list-item-value">${escapeHtml(item.display || '')}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderWatchlist(items = []) {
+      const target = document.getElementById('watchlistList');
+      if (!items.length) {
+        target.innerHTML = '<div class="list-empty">No repeat charges stood out in this window.</div>';
+        return;
+      }
+
+      target.innerHTML = items.map((item, index) => `
+        <div class="list-item">
+          <div class="list-rank">${index + 1}</div>
+          <div>
+            <div class="list-item-title">${escapeHtml(item.merchant || 'Unknown')}</div>
+            <div class="list-item-note">${escapeHtml(item.note || '')}</div>
+          </div>
+          <div class="list-item-value">${escapeHtml(item.display || '')}</div>
+        </div>
+      `).join('');
+    }
+
+    function populateSummary(summary = {}, insights = {}, lookbackDays = 90) {
+      setElementText('resultsTopline', insights.mind_blown_moment || 'Financial X-Ray');
+      setElementText('summarySpendValue', summary.total_spend?.display || '--');
+      setElementText(
+        'summarySpendCaption',
+        summary.total_spend?.display
+          ? `${summary.spend_transaction_count || 0} purchases across ${summary.active_days || 0} active days in the last ${summary.lookback_days || lookbackDays} days.`
+          : 'Upload data or fetch bank activity to light this up.'
+      );
+
+      setElementText('dailyBurnValue', summary.avg_daily_spend?.display || '--');
+      setElementText(
+        'dailyBurnCaption',
+        summary.avg_daily_spend?.display ? `Average across ${summary.active_days || 0} active spend days.` : ''
+      );
+
+      setElementText('largestHitValue', summary.largest_expense?.display || '--');
+      setElementText(
+        'largestHitCaption',
+        summary.largest_expense?.display
+          ? `${summary.largest_expense.merchant || 'Unknown'} on ${summary.largest_expense.date || 'unknown date'}`
+          : ''
+      );
+
+      setElementText('peakDayValue', summary.peak_spend_day?.display || '--');
+      setElementText(
+        'peakDayCaption',
+        summary.peak_spend_day?.display
+          ? `${summary.peak_spend_day.date || 'Unknown'} across ${summary.peak_spend_day.transaction_count || 0} purchases`
+          : ''
+      );
+
+      setElementText('netFlowValue', summary.net_flow?.display || '--');
+      setElementText(
+        'netFlowCaption',
+        summary.net_flow?.display
+          ? `Money in ${summary.total_inflow?.display || '$0.00'} vs out ${summary.gross_outflow?.display || '$0.00'}`
+          : ''
+      );
+
+      renderStoryCards(summary);
+      renderInsightCards(insights, summary);
+      renderMerchantList(Array.isArray(summary.merchant_leaderboard) ? summary.merchant_leaderboard : []);
+      renderWatchlist(Array.isArray(summary.recurring_watchlist) ? summary.recurring_watchlist : []);
+    }
+
     async function generateTip() {
       const btn = document.getElementById('generateBtn');
       const copyBtn = document.getElementById('copyBtn');
@@ -1119,32 +1596,22 @@
 
         const tip = data.tip_analysis?.tip || {};
         const insights = data.tip_analysis?.spending_insights || {};
+        const summary = data.transaction_summary || {};
 
-        // Populate results
         document.getElementById('tipTitle').textContent = tip.title || 'Your Finance Tip';
-        document.getElementById('tipSavings').textContent = tip.potential_savings ? `💰 ${tip.potential_savings}` : '';
-        document.getElementById('tipSavings').style.display = tip.potential_savings ? 'inline-block' : 'none';
         document.getElementById('tipAdvice').textContent = tip.advice || 'No advice available.';
+        setBadge('tipSavings', tip.potential_savings ? `Potential savings ${tip.potential_savings}` : '');
+        setBadge('tipWhyNow', tip.why_now || insights.spending_trend || '');
 
         const steps = Array.isArray(tip.actionable_steps) ? tip.actionable_steps : [];
         document.getElementById('stepsList').innerHTML = steps.map((s, i) => `
           <li>
             <span class="step-number">${i + 1}</span>
-            <span class="step-text">${s}</span>
+            <span class="step-text">${escapeHtml(s)}</span>
           </li>
         `).join('') || '<li><span class="step-text">No steps provided.</span></li>';
 
-        let insightsHtml = '';
-        if (insights.top_spending_category) {
-          insightsHtml += `<div class="insight-card"><div class="insight-label">Top Category</div><div class="insight-value">${insights.top_spending_category}</div></div>`;
-        }
-        if (insights.frequent_merchants?.length) {
-          insightsHtml += `<div class="insight-card"><div class="insight-label">Frequent Merchants</div><div class="insight-value">${insights.frequent_merchants.slice(0,3).join(', ')}</div></div>`;
-        }
-        if (insights.spending_trend) {
-          insightsHtml += `<div class="insight-card"><div class="insight-label">Trend</div><div class="insight-value">${insights.spending_trend}</div></div>`;
-        }
-        document.getElementById('insightsGrid').innerHTML = insightsHtml;
+        populateSummary(summary, insights, data.lookback_days);
 
         hideStatus();
         results.classList.add('visible');
@@ -1160,8 +1627,19 @@
       const title = document.getElementById('tipTitle').textContent;
       const advice = document.getElementById('tipAdvice').textContent;
       const savings = document.getElementById('tipSavings').textContent;
-      const steps = Array.from(document.querySelectorAll('#stepsList .step-text')).map((el, i) => `${i+1}. ${el.textContent}`).join('\n');
-      const text = `${title}\n\n${advice}\n${savings ? '\n' + savings : ''}\n\nAction Steps:\n${steps}`;
+      const whyNow = document.getElementById('tipWhyNow').textContent;
+      const shockwave = document.getElementById('summarySpendValue').textContent;
+      const topLine = document.getElementById('resultsTopline').textContent;
+      const dailyBurn = document.getElementById('dailyBurnValue').textContent;
+      const netFlow = document.getElementById('netFlowValue').textContent;
+      const merchants = Array.from(document.querySelectorAll('#merchantList .list-item-title'))
+        .slice(0, 3)
+        .map(el => el.textContent)
+        .join(', ');
+      const steps = Array.from(document.querySelectorAll('#stepsList .step-text'))
+        .map((el, i) => `${i+1}. ${el.textContent}`)
+        .join('\n');
+      const text = `${title}\n${topLine ? topLine + '\n' : ''}${savings ? savings + '\n' : ''}${whyNow ? whyNow + '\n' : ''}\n${advice}\n\nMoney Shockwave: ${shockwave}\nDaily Burn: ${dailyBurn}\nNet Flow: ${netFlow}\nTop Merchants: ${merchants || 'n/a'}\n\nAction Steps:\n${steps}`;
       navigator.clipboard.writeText(text).then(() => {
         showStatus('success', 'Copied to clipboard!');
         setTimeout(hideStatus, 2000);

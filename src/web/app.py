@@ -1,8 +1,10 @@
 import json
 import logging
+import os
 import re
 import sys
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,6 +14,41 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from finance_tip import generate_finance_tip
 from utils import parse_csv_transactions
+try:
+    from .transaction_insights import (
+        build_monthly_spend_summary,
+        build_transaction_summary,
+        detect_outflow_sign,
+        format_currency,
+        humanize_month,
+        is_internal_money_move,
+        is_savings_allocation,
+        is_vanguard_sell_inflow,
+        is_withdrawal_transaction,
+        merchant_text,
+    )
+except Exception:
+    from transaction_insights import (  # type: ignore
+        build_monthly_spend_summary,
+        build_transaction_summary,
+        detect_outflow_sign,
+        format_currency,
+        humanize_month,
+        is_internal_money_move,
+        is_savings_allocation,
+        is_vanguard_sell_inflow,
+        is_withdrawal_transaction,
+        merchant_text,
+    )
+
+try:
+    from .subscription_finder import identify_subscriptions
+except Exception:
+    try:
+        from subscription_finder import identify_subscriptions
+    except Exception as exc:
+        identify_subscriptions = None  # type: ignore
+        logging.exception("Subscription analysis unavailable: %s", exc)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 350 * 1024 * 1024  # 350MB max upload size
@@ -20,18 +57,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # LLM client
 try:
-    from .llms import generate_json as llm_generate_json
     from .llms import categorize_transactions as llm_categorize_transactions
     from .llms import AVAILABLE_OPENAI_MODELS
 except Exception:
     try:
-        from llms import generate_json as llm_generate_json
         from llms import categorize_transactions as llm_categorize_transactions
         from llms import AVAILABLE_OPENAI_MODELS
     except Exception:
-        llm_generate_json = None
         llm_categorize_transactions = None
-        AVAILABLE_OPENAI_MODELS = ['gpt5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
+        AVAILABLE_OPENAI_MODELS = ['gpt-5-mini-2025-08-07', 'gpt5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -118,6 +152,15 @@ def handle_request_too_large(exc):
     return ('Uploaded file is too large. Apple Health XML uploads are limited to 350MB.', 413)
 
 
+@app.after_request
+def set_security_headers(response):
+    """Set baseline HTTP security headers."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
 def fetch_fresh_transactions_from_plaid(days_back=90):
     """Fetch fresh transactions from Plaid API"""
     try:
@@ -196,7 +239,161 @@ def parse_transaction_file(file_path):
         return {'success': False, 'transactions': [], 'count': 0, 'error': str(e)}
 
 
+def cleanup_transaction_file(file_path):
+    """Delete a temporary transaction file if one was created for the request."""
+    if not file_path or file_path == 'uploaded_csv':
+        return
+    try:
+        Path(file_path).unlink(missing_ok=True)
+        logging.info("Deleted transaction file after processing: %s", file_path)
+    except Exception as exc:
+        logging.warning("Failed to delete transaction file %s: %s", file_path, exc)
 
+
+def load_transactions_from_request(data, default_lookback_days=90):
+    """Load transactions from CSV upload, fresh Plaid fetch, or cached data."""
+    try:
+        lookback_days = int(data.get('lookback_days', default_lookback_days))
+    except (TypeError, ValueError):
+        return {
+            'success': False,
+            'status_code': 400,
+            'error': 'Lookback days must be a whole number.',
+            'transactions': [],
+            'file_path': None,
+            'lookback_days': default_lookback_days,
+        }
+
+    lookback_days = max(7, min(lookback_days, 365))
+    fetch_fresh = bool(data.get('fetch_fresh', False))
+    use_csv = bool(data.get('use_csv', False))
+    csv_data = data.get('csv_data', '')
+    file_path = None
+
+    if use_csv:
+        if not csv_data:
+            return {
+                'success': False,
+                'status_code': 400,
+                'error': 'Upload a CSV file before running the analysis.',
+                'transactions': [],
+                'file_path': None,
+                'lookback_days': lookback_days,
+            }
+
+        logging.info("Using uploaded CSV data...")
+        parse_result = parse_csv_transactions(csv_data)
+        if not parse_result['success']:
+            return {
+                'success': False,
+                'status_code': 400,
+                'error': f'Failed to parse CSV: {parse_result["error"]}',
+                'transactions': [],
+                'file_path': None,
+                'lookback_days': lookback_days,
+            }
+        file_path = 'uploaded_csv'
+    elif fetch_fresh:
+        logging.info("Fetching fresh transactions from Plaid (last %s days)...", lookback_days)
+        fetch_result = fetch_fresh_transactions_from_plaid(days_back=lookback_days)
+        if not fetch_result['success']:
+            return {
+                'success': False,
+                'status_code': 500,
+                'error': f'Failed to fetch transactions: {fetch_result["error"]}',
+                'transactions': [],
+                'file_path': None,
+                'lookback_days': lookback_days,
+            }
+        file_path = fetch_result['file_path']
+        logging.info("Successfully fetched fresh transactions: %s", file_path)
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return {
+                'success': False,
+                'status_code': 500,
+                'error': f'Failed to parse transactions: {parse_result["error"]}',
+                'transactions': [],
+                'file_path': file_path,
+                'lookback_days': lookback_days,
+            }
+    else:
+        logging.info("Using cached transaction data...")
+        fetch_result = fetch_latest_transactions()
+        if not fetch_result['success']:
+            return {
+                'success': False,
+                'status_code': 404,
+                'error': 'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.',
+                'transactions': [],
+                'file_path': None,
+                'lookback_days': lookback_days,
+            }
+        file_path = fetch_result['file_path']
+        logging.info("Using cached file: %s", file_path)
+        parse_result = parse_transaction_file(file_path)
+        if not parse_result['success']:
+            return {
+                'success': False,
+                'status_code': 500,
+                'error': f'Failed to parse transactions: {parse_result["error"]}',
+                'transactions': [],
+                'file_path': file_path,
+                'lookback_days': lookback_days,
+            }
+
+    transactions = parse_result['transactions']
+    if not transactions:
+        return {
+            'success': False,
+            'status_code': 400,
+            'error': 'No transactions found.',
+            'transactions': [],
+            'file_path': file_path,
+            'lookback_days': lookback_days,
+        }
+
+    cutoff = datetime.now() - timedelta(days=lookback_days)
+    filtered_transactions = [
+        transaction for transaction in transactions
+        if transaction.get('datetime') and transaction['datetime'] >= cutoff
+    ]
+
+    if not filtered_transactions:
+        return {
+            'success': False,
+            'status_code': 400,
+            'error': 'No transactions within lookback window.',
+            'transactions': [],
+            'file_path': file_path,
+            'lookback_days': lookback_days,
+        }
+
+    filtered_transactions.sort(key=lambda item: item.get('datetime', datetime.min), reverse=True)
+    return {
+        'success': True,
+        'status_code': 200,
+        'error': None,
+        'transactions': filtered_transactions,
+        'file_path': file_path,
+        'lookback_days': lookback_days,
+    }
+
+
+def get_request_json():
+    """Return JSON request payload or an empty dictionary for invalid JSON."""
+    try:
+        return request.get_json() or {}
+    except Exception:
+        return {}
+
+
+def load_transactions_or_error(data, default_lookback_days=90):
+    """Load transactions and return either load_result or a Flask error response."""
+    load_result = load_transactions_from_request(data, default_lookback_days=default_lookback_days)
+    if load_result['success']:
+        return load_result, None
+    return None, (jsonify({'error': load_result['error']}), load_result['status_code'])
 
 
 # ==================== ROUTES ====================
@@ -208,10 +405,7 @@ def set_plaid_token():
     if not fetch_and_save_transactions or not store_access_token or not create_plaid_client or not exchange_public_token:
         return jsonify({'error': 'Plaid helpers are unavailable on this server. Check your installation.'}), 500
 
-    try:
-        data = request.get_json() or {}
-    except Exception:
-        data = {}
+    data = get_request_json()
 
     access_token = (data.get('access_token') or '').strip()
     public_token = (data.get('public_token') or '').strip()
@@ -237,7 +431,6 @@ def set_plaid_token():
         response = {
             'success': True,
             'item_id': metadata.get('item_id'),
-            'access_token': metadata.get('access_token'),
             'source': metadata.get('source'),
             'stored_at': metadata.get('stored_at'),
         }
@@ -260,10 +453,7 @@ def create_link_token_api():
         logging.exception("Unable to initialize Plaid pipeline")
         return jsonify({'error': str(exc)}), 500
 
-    try:
-        data = request.get_json() or {}
-    except Exception:
-        data = {}
+    data = get_request_json()
 
     user_id = (data.get('user_id') or '').strip()
     if not user_id:
@@ -299,10 +489,16 @@ def tip_page():
     return render_template('finance_tip.html')
 
 
-@app.route('/categorize')
-def categorize_page():
-    """Transaction categorization page"""
-    return render_template('categorize_transactions.html')
+@app.route('/subscriptions')
+def subscriptions_page():
+    """Subscription detection page."""
+    return render_template('subscriptions.html')
+
+
+@app.route('/monthly-spend')
+def monthly_spend_page():
+    """Monthly expenditure breakdown page."""
+    return render_template('monthly_spend.html')
 
 
 @app.route('/health')
@@ -374,86 +570,43 @@ def analyze_apple_health_api():
 @app.route('/api/finance-tip', methods=['POST'])
 def get_finance_tip():
     """Generate personalized finance tip"""
+    file_path = None
     try:
-        data = request.get_json() or {}
-        fetch_fresh = data.get('fetch_fresh', False)
-        lookback_days = int(data.get('lookback_days', 90))
-        use_csv = data.get('use_csv', False)
-        csv_data = data.get('csv_data', '')
+        data = get_request_json()
         openai_api_key = data.get('openai_api_key', '')
         use_openai = data.get('use_openai', False)
         model = data.get('model', '')
-        
-        if use_csv and csv_data:
-            # Parse CSV data directly
-            logging.info("Using uploaded CSV data...")
-            parse_result = parse_csv_transactions(csv_data)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse CSV: {parse_result["error"]}'}), 400
-            file_path = 'uploaded_csv'
-        elif fetch_fresh:
-            # Fetch fresh data from Plaid API
-            logging.info(f"Fetching fresh transactions from Plaid (last {lookback_days} days)...")
-            fetch_result = fetch_fresh_transactions_from_plaid(days_back=lookback_days)
-            if not fetch_result['success']:
-                return jsonify({'error': f'Failed to fetch transactions: {fetch_result["error"]}'}), 500
-            file_path = fetch_result['file_path']
-            logging.info(f"Successfully fetched fresh transactions: {file_path}")
-            parse_result = parse_transaction_file(file_path)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
-        else:
-            # Use existing cached transaction file
-            logging.info("Using cached transaction data...")
-            fetch_result = fetch_latest_transactions()
-            if not fetch_result['success']:
-                return jsonify({'error': f'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.'}), 404
-            file_path = fetch_result['file_path']
-            logging.info(f"Using cached file: {file_path}")
-            parse_result = parse_transaction_file(file_path)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
-        
-        transactions = parse_result['transactions']
-        if not transactions:
-            return jsonify({'error': 'No transactions found'}), 400
-        
-        cutoff = datetime.now() - timedelta(days=lookback_days)
-        transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
-        
-        if not transactions:
-            return jsonify({'error': 'No transactions within lookback window'}), 400
-        
+        load_result, error_response = load_transactions_or_error(data)
+        if error_response:
+            return error_response
+
+        file_path = load_result['file_path']
+        lookback_days = load_result['lookback_days']
+        transactions = load_result['transactions']
         tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai, model=model)
-        
-        response = jsonify({
-            'success': tip_result['success'],
-            'file_path': file_path,
+        transaction_summary = build_transaction_summary(transactions, lookback_days)
+        response_success = tip_result['success'] or bool(transaction_summary)
+
+        return jsonify({
+            'success': response_success,
             'transaction_count': len(transactions),
             'lookback_days': lookback_days,
             'tip_analysis': tip_result.get('analysis', {}),
-            'error': tip_result.get('error'),
+            'transaction_summary': transaction_summary,
             'error': tip_result.get('error'),
             'timestamp': datetime.now().isoformat()
         })
-        
-        # Delete transaction data after request is complete
-        if file_path and file_path != 'uploaded_csv':
-            try:
-                Path(file_path).unlink(missing_ok=True)
-                logging.info(f"Deleted transaction file after processing: {file_path}")
-            except Exception as del_err:
-                logging.warning(f"Failed to delete transaction file {file_path}: {del_err}")
-        
-        return response
     except Exception as e:
         return jsonify({'error': f'Finance tip analysis failed: {str(e)}'}), 500
+    finally:
+        cleanup_transaction_file(file_path)
 
 
 # ==================== EMAIL SIGNUP ====================
 
 # File to store email signups
 EMAIL_SIGNUPS_FILE = Path(__file__).parent / 'email_signups.json'
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 
 def load_email_signups():
@@ -495,10 +648,7 @@ def save_email_signup(email, name=None):
 @app.route('/api/email-signup', methods=['POST'])
 def email_signup():
     """Handle email signup for paid hosted version waitlist"""
-    try:
-        data = request.get_json() or {}
-    except Exception:
-        data = {}
+    data = get_request_json()
     
     email = (data.get('email') or '').strip().lower()
     name = (data.get('name') or '').strip() or None
@@ -507,9 +657,7 @@ def email_signup():
     if not email:
         return jsonify({'error': 'Email is required'}), 400
     
-    # Basic email validation
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_pattern, email):
+    if not EMAIL_PATTERN.match(email):
         return jsonify({'error': 'Please enter a valid email address'}), 400
     
     result = save_email_signup(email, name)
@@ -529,111 +677,240 @@ def email_signup():
         return jsonify({'error': result.get('error', 'Signup failed')}), 500
 
 
-@app.route('/api/categorize-transactions', methods=['POST'])
-def categorize_transactions_api():
-    """Categorize transactions using LLM"""
+@app.route('/api/monthly-spend', methods=['POST'])
+def monthly_spend_api():
+    """Return month-level expenditure with a category breakdown and savings bucket."""
     if not llm_categorize_transactions:
         return jsonify({'error': 'LLM categorization not available'}), 500
-    
+
+    file_path = None
     try:
-        data = request.get_json() or {}
-        fetch_fresh = data.get('fetch_fresh', False)
-        lookback_days = int(data.get('lookback_days', 90))
-        use_csv = data.get('use_csv', False)
-        csv_data = data.get('csv_data', '')
+        data = get_request_json()
+        requested_month = str(data.get('month') or '').strip()
+        if requested_month and not re.fullmatch(r'\d{4}-\d{2}', requested_month):
+            return jsonify({'error': 'Month must use YYYY-MM format.'}), 400
+
         openai_api_key = data.get('openai_api_key', '')
         use_openai = data.get('use_openai', False)
         model = data.get('model', '')
-        
-        if use_csv and csv_data:
-            # Parse CSV data directly
-            logging.info("Using uploaded CSV data...")
-            parse_result = parse_csv_transactions(csv_data)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse CSV: {parse_result["error"]}'}), 400
-            file_path = 'uploaded_csv'
-        elif fetch_fresh:
-            logging.info(f"Fetching fresh transactions from Plaid (last {lookback_days} days)...")
-            fetch_result = fetch_fresh_transactions_from_plaid(days_back=lookback_days)
-            if not fetch_result['success']:
-                return jsonify({'error': f'Failed to fetch transactions: {fetch_result["error"]}'}), 500
-            file_path = fetch_result['file_path']
-            logging.info(f"Successfully fetched fresh transactions: {file_path}")
-            parse_result = parse_transaction_file(file_path)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
-        else:
-            logging.info("Using cached transaction data...")
-            fetch_result = fetch_latest_transactions()
-            if not fetch_result['success']:
-                return jsonify({'error': 'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.'}), 404
-            file_path = fetch_result['file_path']
-            logging.info(f"Using cached file: {file_path}")
-            parse_result = parse_transaction_file(file_path)
-            if not parse_result['success']:
-                return jsonify({'error': f'Failed to parse transactions: {parse_result["error"]}'}), 500
-        
-        transactions = parse_result['transactions']
-        if not transactions:
-            return jsonify({'error': 'No transactions found'}), 400
-        
-        cutoff = datetime.now() - timedelta(days=lookback_days)
-        transactions = [t for t in transactions if t.get('datetime') and t['datetime'] >= cutoff]
-        
-        if not transactions:
-            return jsonify({'error': 'No transactions within lookback window'}), 400
-        
-        # Sort by date descending (most recent first)
-        transactions.sort(key=lambda x: x.get('datetime', datetime.min), reverse=True)
-        
-        logging.info(f"Categorizing {len(transactions)} transactions...")
-        categorization_result = llm_categorize_transactions(
-            transactions,
-            model=model,
-            openai_api_key=openai_api_key,
-            use_openai=use_openai
+        load_result, error_response = load_transactions_or_error(data, default_lookback_days=180)
+        if error_response:
+            return error_response
+
+        file_path = load_result['file_path']
+        lookback_days = load_result['lookback_days']
+        transactions = load_result['transactions']
+
+        ordered = sorted(
+            [trx for trx in transactions if trx.get('datetime')],
+            key=lambda trx: trx['datetime'],
         )
-        
-        if not categorization_result.get('success'):
-            return jsonify({
-                'error': f'Categorization failed: {categorization_result.get("error")}'
-            }), 500
-        
-        categorized_transactions = categorization_result.get('categorized_transactions', [])
-        
-        # Calculate category summaries
-        category_summary = {}
-        for trx in categorized_transactions:
-            category = trx.get('category', 'Other')
-            amount = trx.get('amount', 0)
-            if category not in category_summary:
-                category_summary[category] = {'count': 0, 'total': 0}
-            category_summary[category]['count'] += 1
-            category_summary[category]['total'] += amount
-        
-        response = jsonify({
+        if not ordered:
+            return jsonify({'error': 'No valid transactions with dates were found.'}), 400
+
+        outflow_sign = detect_outflow_sign(ordered)
+        outflows = [trx for trx in ordered if float(trx.get('amount') or 0) * outflow_sign > 0]
+        if not outflows:
+            return jsonify({'error': 'No spend-like transactions were found in the selected window.'}), 400
+
+        month_outflows = defaultdict(list)
+        for trx in outflows:
+            month_outflows[trx['datetime'].strftime('%Y-%m')].append(trx)
+
+        available_month_keys = sorted(month_outflows.keys(), reverse=True)
+        if not available_month_keys:
+            return jsonify({'error': 'No monthly spending data found.'}), 400
+
+        selected_month = requested_month if requested_month in month_outflows else available_month_keys[0]
+        selected_month_transactions = [
+            trx for trx in ordered
+            if trx['datetime'].strftime('%Y-%m') == selected_month
+        ]
+        selected_month_outflows = [
+            trx for trx in selected_month_transactions
+            if float(trx.get('amount') or 0) * outflow_sign > 0
+        ]
+        savings_transactions = [trx for trx in selected_month_outflows if is_savings_allocation(trx)]
+        vanguard_sell_inflow_transactions = [
+            trx for trx in selected_month_transactions
+            if is_vanguard_sell_inflow(trx, outflow_sign)
+        ]
+
+        spend_transactions = [
+            trx for trx in selected_month_outflows
+            if not is_internal_money_move(trx) and not is_savings_allocation(trx)
+        ]
+        if not spend_transactions:
+            spend_transactions = [trx for trx in selected_month_outflows if not is_savings_allocation(trx)]
+
+        categorized_transactions = []
+        if spend_transactions:
+            categorization_result = llm_categorize_transactions(
+                spend_transactions,
+                model=model,
+                openai_api_key=openai_api_key,
+                use_openai=use_openai,
+            )
+            if not categorization_result.get('success'):
+                return jsonify({'error': f'Categorization failed: {categorization_result.get("error")}'}), 500
+            categorized_transactions = categorization_result.get('categorized_transactions', [])
+
+        categorized_by_transaction_id = {}
+        for idx, categorized in enumerate(categorized_transactions):
+            if idx < len(spend_transactions):
+                categorized_by_transaction_id[id(spend_transactions[idx])] = categorized
+
+        debug_transactions = []
+        for trx in sorted(selected_month_transactions, key=lambda item: item.get('datetime', datetime.min), reverse=True):
+            raw_amount = float(trx.get('amount') or 0)
+            is_outflow = raw_amount * outflow_sign > 0
+            is_savings = is_savings_allocation(trx)
+            is_internal = is_internal_money_move(trx)
+            is_withdrawal = is_withdrawal_transaction(trx)
+            is_vanguard_sell = is_vanguard_sell_inflow(trx, outflow_sign)
+
+            if is_vanguard_sell:
+                bucket = 'vanguard_sell_inflow'
+                bucket_reason = 'savings_offset'
+            elif is_outflow and is_savings:
+                bucket = 'savings'
+                bucket_reason = 'withdrawal' if is_withdrawal else 'savings_destination'
+            elif is_outflow and is_internal:
+                bucket = 'internal_move'
+                bucket_reason = 'internal_transfer_or_payment'
+            elif is_outflow:
+                bucket = 'expenditure'
+                bucket_reason = 'categorized_spending'
+            else:
+                bucket = 'inflow'
+                bucket_reason = 'inflow_or_credit'
+
+            categorized = categorized_by_transaction_id.get(id(trx))
+            category = ''
+            subcategory = ''
+            confidence = ''
+            if bucket == 'expenditure':
+                if categorized:
+                    category = categorized.get('category') or 'Other'
+                    subcategory = categorized.get('subcategory') or ''
+                    confidence = categorized.get('confidence') or 'medium'
+                else:
+                    category = 'Uncategorized'
+                    subcategory = 'Not analyzed (categorization limit)'
+                    confidence = 'n/a'
+
+            debug_transactions.append(
+                {
+                    'date': trx.get('date'),
+                    'merchant': merchant_text(trx),
+                    'account_name': trx.get('account_name') or trx.get('account') or '',
+                    'raw_amount': round(raw_amount, 2),
+                    'amount': round(abs(raw_amount), 2),
+                    'amount_display': format_currency(abs(raw_amount)),
+                    'bucket': bucket,
+                    'bucket_reason': bucket_reason,
+                    'category': category,
+                    'subcategory': subcategory,
+                    'confidence': confidence,
+                    'is_savings': is_savings,
+                    'is_internal_move': is_internal,
+                    'is_withdrawal': is_withdrawal,
+                    'is_vanguard_sell_inflow': is_vanguard_sell,
+                }
+            )
+
+        summary = build_monthly_spend_summary(
+            categorized_transactions,
+            savings_transactions,
+            vanguard_sell_inflow_transactions=vanguard_sell_inflow_transactions,
+        )
+        savings_offset_transactions = [
+            {
+                'date': trx.get('date'),
+                'merchant': merchant_text(trx),
+                'amount': round(abs(float(trx.get('amount') or 0)), 2),
+                'display': format_currency(abs(float(trx.get('amount') or 0))),
+            }
+            for trx in sorted(vanguard_sell_inflow_transactions, key=lambda item: item.get('datetime', datetime.min), reverse=True)
+        ]
+        available_months = [
+            {
+                'key': month_key,
+                'label': humanize_month(month_key),
+                'transaction_count': len(month_outflows[month_key]),
+            }
+            for month_key in available_month_keys
+        ]
+
+        return jsonify({
             'success': True,
-            'file_path': file_path,
-            'transaction_count': len(categorized_transactions),
             'lookback_days': lookback_days,
-            'transactions': categorized_transactions,
-            'category_summary': category_summary,
-            'timestamp': datetime.now().isoformat()
+            'selected_month': selected_month,
+            'selected_month_label': humanize_month(selected_month),
+            'available_months': available_months,
+            'source_transaction_count': len(transactions),
+            'month_transaction_count': len(selected_month_transactions),
+            'month_outflow_count': len(selected_month_outflows),
+            'savings_transaction_count': len(savings_transactions),
+            'vanguard_sell_inflow_count': len(vanguard_sell_inflow_transactions),
+            'spend_transaction_count': len(spend_transactions),
+            'analyzed_transaction_count': len(categorized_transactions),
+            'analysis_limited': len(spend_transactions) > len(categorized_transactions),
+            'total_expenditure': summary['total_expenditure'],
+            'total_savings': summary['total_savings'],
+            'total_savings_gross': summary['total_savings_gross'],
+            'vanguard_sell_inflows_offset': summary['vanguard_sell_inflows_offset'],
+            'category_count': summary['category_count'],
+            'top_category': summary['top_category'],
+            'category_breakdown': summary['category_breakdown'],
+            'top_merchants': summary['top_merchants'],
+            'savings_offset_transactions': savings_offset_transactions,
+            'transactions': debug_transactions,
+            'timestamp': datetime.now().isoformat(),
         })
-        
-        # Delete transaction data after request is complete
-        if file_path and file_path != 'uploaded_csv':
-            try:
-                Path(file_path).unlink(missing_ok=True)
-                logging.info(f"Deleted transaction file after processing: {file_path}")
-            except Exception as del_err:
-                logging.warning(f"Failed to delete transaction file {file_path}: {del_err}")
-        
-        return response
-    except Exception as e:
-        logging.exception("Transaction categorization failed")
-        return jsonify({'error': f'Transaction categorization failed: {str(e)}'}), 500
+    except Exception as exc:
+        logging.exception("Monthly spend analysis failed")
+        return jsonify({'error': f'Monthly spend analysis failed: {exc}'}), 500
+    finally:
+        cleanup_transaction_file(file_path)
+
+
+@app.route('/api/subscriptions', methods=['POST'])
+def identify_subscriptions_api():
+    """Identify recurring subscription-like charges from transaction history."""
+    if not identify_subscriptions:
+        return jsonify({'error': 'Subscription analysis is unavailable on this server.'}), 500
+
+    file_path = None
+    try:
+        data = get_request_json()
+        load_result, error_response = load_transactions_or_error(data, default_lookback_days=365)
+        if error_response:
+            return error_response
+
+        file_path = load_result['file_path']
+        lookback_days = load_result['lookback_days']
+        transactions = load_result['transactions']
+
+        analysis_result = identify_subscriptions(transactions)
+        if not analysis_result.get('success'):
+            return jsonify({'error': analysis_result.get('error', 'Subscription analysis failed.')}), 500
+
+        return jsonify({
+            'success': True,
+            'transaction_count': len(transactions),
+            'lookback_days': lookback_days,
+            'subscriptions': analysis_result.get('subscriptions', []),
+            'summary': analysis_result.get('summary', {}),
+            'timestamp': datetime.now().isoformat(),
+        })
+    except Exception as exc:
+        logging.exception("Subscription analysis failed")
+        return jsonify({'error': f'Subscription analysis failed: {exc}'}), 500
+    finally:
+        cleanup_transaction_file(file_path)
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug_enabled = (os.getenv('FLASK_DEBUG', '0').strip() == '1')
+    app.run(debug=debug_enabled, host='0.0.0.0', port=5000)

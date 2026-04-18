@@ -18,6 +18,7 @@ OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
 # Available OpenAI models for selection
 AVAILABLE_OPENAI_MODELS = [
     'gpt-5.1',
+    'gpt-5-mini-2025-08-07',
     'gpt-4o',
     'gpt-5-mini',
     'gpt-oss-120b',
@@ -305,4 +306,3 @@ Rules:
         "total_processed": len(enriched_transactions),
         "error": None
     }
-

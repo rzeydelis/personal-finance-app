@@ -319,7 +319,8 @@
       </div>
       <div class="nav-links">
         <a href="/">Insights</a>
-        <a href="/categorize">Categorize</a>
+        <a href="/subscriptions">Subscriptions</a>
+        <a href="/monthly-spend">Monthly Spend</a>
         <a href="/health">Health</a>
         <a href="/plaid-link" class="active">Connect Bank</a>
       </div>
@@ -382,6 +383,15 @@
     let linkToken = null;
 
     document.addEventListener('DOMContentLoaded', requestLinkToken);
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function getSessionUserId() {
       const storageKey = 'plaid_user_id';
@@ -500,8 +510,8 @@
 
         linkStatus.className = 'status visible success';
         linkStatus.innerHTML = `
-          <strong>✓ Successfully connected to ${institution}!</strong><br>
-          <span style="font-size: 0.85rem; opacity: 0.9;">You can now use "Fetch fresh data" on the Insights or Categorize pages.</span>
+          <strong>✓ Successfully connected to ${escapeHtml(institution)}!</strong><br>
+          <span style="font-size: 0.85rem; opacity: 0.9;">You can now use "Fetch fresh data" on the Insights, Subscriptions, or Monthly Spend pages.</span>
         `;
       } catch (err) {
         linkStatus.className = 'status visible error';
@@ -511,3 +521,4 @@
   </script>
 </body>
 </html>
+
