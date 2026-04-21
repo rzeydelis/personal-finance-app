@@ -157,11 +157,14 @@ cython_debug/
 transactions_*.txt
 *.csv
 *.xlsx
+data/plaid_access_tokens.json
 
 # API keys and sensitive configuration
 .env
 config.ini
 secrets.json
+src/web/email_signups.json
+/.codex_tmp/
 
 # Database files
 *.db
