@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transaction RAG Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --bg-card: #18181f;
+      --bg-hover: #1f1f28;
+      --bg-elev: #14141b;
+      --accent: #14b8a6;
+      --accent-light: #2dd4bf;
+      --accent-glow: rgba(20, 184, 166, 0.18);
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --text-dim: #52525b;
+      --success: #10b981;
+      --error: #ef4444;
+      --border: #27272a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50vh;
+      background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: 1180px;
+      margin: 0 auto;
+      gap: 16px;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-links a.active { color: var(--text); background: var(--accent); }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px 50px;
+      display: grid;
+      grid-template-columns: minmax(290px, 0.9fr) minmax(0, 1.5fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .panel h1,
+    .panel h2 {
+      margin: 0 0 10px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .panel h1 {
+      font-size: 1.6rem;
+      line-height: 1.15;
+    }
+
+    .panel h2 { font-size: 0.95rem; color: var(--text-muted); }
+
+    .lead {
+      margin: 0 0 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .control-group {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .source-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .source-tab {
+      flex: 1;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .source-tab:hover { border-color: var(--text-dim); color: var(--text); }
+    .source-tab.active {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      color: var(--text);
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field,
+    .field-wide {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field-wide { grid-column: 1 / -1; }
+
+    .field label,
+    .field-wide label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    .field input,
+    .field select,
+    .field-wide input {
+      width: 100%;
+      padding: 10px 11px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field-wide input:focus,
+    .chat-input:focus {
+      border-color: var(--accent);
+    }
+
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 11px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .toggle-chip input { accent-color: var(--accent); }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      background: var(--bg-elev);
+    }
+
+    .file-drop:hover,
+    .file-drop.dragover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: var(--accent-glow);
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-elev);
+      padding: 10px 12px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn:hover { background: var(--bg-hover); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      border-color: transparent;
+      color: #052825;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+    }
+
+    .chat-shell {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 72vh;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--bg-elev);
+    }
+
+    .chat-header-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .chat-header-copy {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .chat-thread {
+      overflow-y: auto;
+      padding: 18px 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0%, rgba(0, 0, 0, 0.08) 100%);
+    }
+
+    .msg {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-width: 92%;
+      font-size: 0.93rem;
+    }
+
+    .msg-user {
+      justify-self: end;
+      background: rgba(20, 184, 166, 0.16);
+      border-color: rgba(45, 212, 191, 0.35);
+    }
+
+    .msg-assistant {
+      justify-self: start;
+      background: var(--bg-elev);
+    }
+
+    .msg-meta {
+      margin-top: 9px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: grid;
+      gap: 4px;
+    }
+
+    .match-list {
+      margin-top: 6px;
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .match-list li {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .chat-composer {
+      border-top: 1px solid var(--border);
+      padding: 14px 16px;
+      display: grid;
+      gap: 10px;
+      background: var(--bg-elev);
+    }
+
+    .composer-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .chat-input {
+      width: 100%;
+      min-height: 70px;
+      max-height: 180px;
+      resize: vertical;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      line-height: 1.45;
+    }
+
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.87rem;
+    }
+
+    .status.visible { display: flex; }
+    .status.error {
+      border-color: rgba(239, 68, 68, 0.34);
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+    }
+    .status.success {
+      border-color: rgba(16, 185, 129, 0.34);
+      background: rgba(16, 185, 129, 0.1);
+      color: #6ee7b7;
+    }
+    .status.loading {
+      color: var(--text-muted);
+      background: var(--bg);
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .chat-shell {
+        min-height: 62vh;
+      }
+    }
+
+    @media (max-width: 640px) {
+      nav {
+        padding: 12px 16px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main {
+        padding: 0 16px 30px;
+      }
+
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .composer-row {
+        grid-template-columns: 1fr;
+      }
+
+      .composer-row .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <div class="logo">Pluto Finance</div>
+      <div class="nav-links">
+        <a href="/">Insights</a>
+        <a href="/monthly-spend">Monthly Spend</a>
+        <a href="/rag" class="active">RAG Chat</a>
+        <a href="/health">Health</a>
+        <a href="/plaid-link">Connect Bank</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="panel">
+        <h1>Ask Questions About Your Transactions</h1>
+        <p class="lead">
+          This chat uses your local transaction RAG index (`data/transactions_rag_vectors.sqlite3`) and returns matched evidence with each answer.
+        </p>
+
+        <div class="control-group">
+          <h2>Data Source</h2>
+          <div class="source-tabs">
+            <button type="button" id="tabBank" class="source-tab active" onclick="selectSource('bank')">Connected Bank</button>
+            <button type="button" id="tabCsv" class="source-tab" onclick="selectSource('csv')">Upload CSV</button>
+          </div>
+
+          <div id="bankSource">
+            <div class="toggle-row">
+              <label class="toggle-chip">
+                <input type="checkbox" id="fetchFresh" />
+                <span>Fetch fresh bank data</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="csvSource" style="display: none;">
+            <div class="file-drop" id="fileDrop" onclick="document.getElementById('csvInput').click()">
+              Click to upload or drag a CSV transaction file.
+            </div>
+            <input id="csvInput" type="file" accept=".csv" style="display:none" onchange="handleFileSelect(event)" />
+            <div id="fileInfo" class="file-info">
+              <span id="fileName"></span>
+              <button type="button" class="btn" onclick="clearFile()">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h2>RAG Settings</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="lookback">Lookback Days</label>
+              <input id="lookback" type="number" min="7" max="365" value="365" />
+            </div>
+            <div class="field">
+              <label for="topK">Top K Matches</label>
+              <input id="topK" type="number" min="1" max="20" value="8" />
+            </div>
+            <div class="field-wide">
+              <label for="vectorDbFile">Vector DB File Name</label>
+              <input id="vectorDbFile" type="text" value="transactions_rag_vectors.sqlite3" />
+            </div>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-chip">
+              <input id="forceReindex" type="checkbox" />
+              <span>Force reindex on next question</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h2>LLM Settings (Optional)</h2>
+          <div class="toggle-row">
+            <label class="toggle-chip">
+              <input id="useLlm" type="checkbox" onchange="toggleLlm(this.checked)" />
+              <span>Use LLM answer synthesis</span>
+            </label>
+            <label class="toggle-chip">
+              <input id="useOpenAI" type="checkbox" onchange="toggleOpenAI(this.checked)" disabled />
+              <span>Use OpenAI</span>
+            </label>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="modelSelect">Model</label>
+              <select id="modelSelect" disabled>
+                <option value="gpt-5-mini">gpt-5-mini</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="apiToken">App API Token (optional)</label>
+              <input id="apiToken" type="password" placeholder="Needed only if APP_API_TOKEN is set" />
+            </div>
+            <div class="field-wide">
+              <label for="openaiApiKey">OpenAI API Key (optional)</label>
+              <input id="openaiApiKey" type="password" placeholder="sk-..." disabled />
+            </div>
+          </div>
+        </div>
+
+        <p class="hint">
+          Tip: ask precise questions like "What did I spend on restaurants last month?" or "largest merchants in my last 90 days."
+        </p>
+      </section>
+
+      <section class="chat-shell">
+        <div class="chat-header">
+          <div>
+            <div class="chat-header-title">Transaction RAG Assistant</div>
+            <div class="chat-header-copy">Answers are grounded in matched transactions from your local index.</div>
+          </div>
+          <button type="button" class="btn" onclick="clearChat()">Clear Chat</button>
+        </div>
+
+        <div id="chatThread" class="chat-thread"></div>
+
+        <div class="chat-composer">
+          <div id="status" class="status">
+            <div class="spinner"></div>
+            <span id="statusText">Working...</span>
+          </div>
+          <div class="composer-row">
+            <textarea
+              id="chatInput"
+              class="chat-input"
+              placeholder="Ask a question about your transactions..."
+            ></textarea>
+            <button id="askBtn" type="button" class="btn btn-primary" onclick="askQuestion()">Ask</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let currentSource = 'bank';
+    let uploadedCsv = null;
+    let useLlm = false;
+    let useOpenAI = false;
+    let selectedModel = 'gpt-5-mini';
+    let inFlight = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupDragDrop();
+      loadModels();
+      appendAssistantMessage(
+        'Ready. Ask your first question and I will search your local transaction vectors.',
+        { confidence: 'n/a' }
+      );
+      const input = document.getElementById('chatInput');
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          askQuestion();
+        }
+      });
+    });
+
+    function setupDragDrop() {
+      const drop = document.getElementById('fileDrop');
+      ['dragenter', 'dragover'].forEach(name => {
+        drop.addEventListener(name, event => {
+          event.preventDefault();
+          drop.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        drop.addEventListener(name, event => {
+          event.preventDefault();
+          drop.classList.remove('dragover');
+        });
+      });
+      drop.addEventListener('drop', event => {
+        const file = event.dataTransfer.files[0];
+        if (file) processFile(file);
+      });
+    }
+
+    async function loadModels() {
+      try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '';
+        (data.models || []).forEach(model => {
+          const option = document.createElement('option');
+          option.value = model;
+          option.textContent = model;
+          if (model === (data.default || 'gpt-5-mini')) {
+            option.selected = true;
+            selectedModel = model;
+          }
+          select.appendChild(option);
+        });
+        select.addEventListener('change', () => {
+          selectedModel = select.value;
+        });
+      } catch (error) {
+        console.error('Failed to load models', error);
+      }
+    }
+
+    function selectSource(source) {
+      currentSource = source;
+      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
+      document.getElementById('tabCsv').classList.toggle('active', source === 'csv');
+      document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
+      document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) processFile(file);
+    }
+
+    function processFile(file) {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        showStatus('error', 'Upload a CSV file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = result => {
+        uploadedCsv = result.target.result;
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('visible');
+      };
+      reader.readAsText(file);
+    }
+
+    function clearFile() {
+      uploadedCsv = null;
+      document.getElementById('csvInput').value = '';
+      document.getElementById('fileInfo').classList.remove('visible');
+    }
+
+    function toggleLlm(enabled) {
+      useLlm = enabled;
+      document.getElementById('useOpenAI').disabled = !enabled;
+      if (!enabled) {
+        useOpenAI = false;
+        document.getElementById('useOpenAI').checked = false;
+      }
+      syncLlmInputs();
+    }
+
+    function toggleOpenAI(enabled) {
+      useOpenAI = enabled;
+      syncLlmInputs();
+    }
+
+    function syncLlmInputs() {
+      document.getElementById('openaiApiKey').disabled = !(useLlm && useOpenAI);
+      document.getElementById('modelSelect').disabled = !(useLlm && useOpenAI);
+    }
+
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      status.className = `status visible ${type}`;
+      statusText.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+      if (type !== 'loading') {
+        window.setTimeout(() => {
+          if (!inFlight) {
+            status.classList.remove('visible');
+          }
+        }, 2400);
+      }
+    }
+
+    function hideStatus() {
+      document.getElementById('status').classList.remove('visible');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function clearChat() {
+      document.getElementById('chatThread').innerHTML = '';
+      appendAssistantMessage(
+        'Chat cleared. Ask another question whenever you are ready.',
+        { confidence: 'n/a' }
+      );
+    }
+
+    function appendUserMessage(text) {
+      const thread = document.getElementById('chatThread');
+      const message = document.createElement('div');
+      message.className = 'msg msg-user';
+      message.textContent = text;
+      thread.appendChild(message);
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    function appendAssistantMessage(text, meta = null) {
+      const thread = document.getElementById('chatThread');
+      const message = document.createElement('div');
+      message.className = 'msg msg-assistant';
+      message.innerHTML = escapeHtml(text);
+
+      if (meta) {
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'msg-meta';
+
+        if (meta.confidence) {
+          const conf = document.createElement('div');
+          conf.textContent = `Confidence: ${meta.confidence}`;
+          metaDiv.appendChild(conf);
+        }
+
+        if (meta.citations && meta.citations.length) {
+          const cites = document.createElement('div');
+          cites.textContent = `Citations: ${meta.citations.join(', ')}`;
+          metaDiv.appendChild(cites);
+        }
+
+        if (meta.indexedDocuments != null) {
+          const indexed = document.createElement('div');
+          indexed.textContent = `Indexed docs: ${meta.indexedDocuments} (${meta.indexRefreshed ? 'refreshed' : 'reused'})`;
+          metaDiv.appendChild(indexed);
+        }
+
+        if (Array.isArray(meta.matches) && meta.matches.length) {
+          const details = document.createElement('details');
+          const summary = document.createElement('summary');
+          summary.textContent = `Top matches (${meta.matches.length})`;
+          details.appendChild(summary);
+
+          const list = document.createElement('ul');
+          list.className = 'match-list';
+          meta.matches.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = `${item.date || 'n/a'} | ${item.merchant || 'Unknown'} | ${formatAmount(item.amount)} | score ${item.score}`;
+            list.appendChild(li);
+          });
+          details.appendChild(list);
+          metaDiv.appendChild(details);
+        }
+
+        if (meta.llmError) {
+          const llmError = document.createElement('div');
+          llmError.textContent = `LLM fallback: ${meta.llmError}`;
+          metaDiv.appendChild(llmError);
+        }
+
+        if (meta.lookbackFallbackMessage) {
+          const lookbackNote = document.createElement('div');
+          lookbackNote.textContent = `Lookback fallback: ${meta.lookbackFallbackMessage}`;
+          metaDiv.appendChild(lookbackNote);
+        }
+
+        message.appendChild(metaDiv);
+      }
+
+      thread.appendChild(message);
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    function formatAmount(value) {
+      const amount = Number(value || 0);
+      return `$${amount.toFixed(2)}`;
+    }
+
+    function buildPayload(question) {
+      const payload = {
+        question,
+        lookback_days: Number(document.getElementById('lookback').value || 365),
+        top_k: Number(document.getElementById('topK').value || 8),
+        vector_db_file: (document.getElementById('vectorDbFile').value || '').trim() || 'transactions_rag_vectors.sqlite3',
+        force_reindex: document.getElementById('forceReindex').checked,
+        use_llm: useLlm,
+        use_openai: useOpenAI,
+        model: useOpenAI ? selectedModel : '',
+        openai_api_key: (document.getElementById('openaiApiKey').value || '').trim(),
+        api_token: (document.getElementById('apiToken').value || '').trim()
+      };
+
+      if (currentSource === 'csv') {
+        if (!uploadedCsv) {
+          throw new Error('Upload a CSV file before asking questions.');
+        }
+        payload.use_csv = true;
+        payload.csv_data = uploadedCsv;
+        payload.fetch_fresh = false;
+      } else {
+        payload.fetch_fresh = document.getElementById('fetchFresh').checked;
+      }
+
+      return payload;
+    }
+
+    async function askQuestion() {
+      if (inFlight) return;
+
+      const input = document.getElementById('chatInput');
+      const question = (input.value || '').trim();
+      if (!question) {
+        showStatus('error', 'Enter a question first.');
+        return;
+      }
+
+      let payload = null;
+      try {
+        payload = buildPayload(question);
+      } catch (error) {
+        showStatus('error', error.message || 'Invalid input.');
+        return;
+      }
+
+      inFlight = true;
+      document.getElementById('askBtn').disabled = true;
+      appendUserMessage(question);
+      input.value = '';
+      showStatus('loading', 'Searching transaction vectors...');
+
+      try {
+        const response = await fetch('/api/transactions-rag/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Query failed.');
+        }
+
+        appendAssistantMessage(data.answer || 'No answer returned.', {
+          confidence: data.confidence,
+          citations: data.citations || [],
+          indexedDocuments: data.indexed_documents,
+          indexRefreshed: data.index_refreshed,
+          matches: data.matches || [],
+          llmError: data.llm_error || null,
+          lookbackFallbackMessage: data.lookback_fallback_used ? (data.lookback_fallback_message || '') : ''
+        });
+
+        showStatus('success', 'Answer ready.');
+      } catch (error) {
+        appendAssistantMessage(`Request failed: ${error.message || 'Unknown error.'}`);
+        showStatus('error', error.message || 'Request failed.');
+      } finally {
+        inFlight = false;
+        document.getElementById('askBtn').disabled = false;
+        if (!document.getElementById('status').classList.contains('error')) {
+          window.setTimeout(hideStatus, 900);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
