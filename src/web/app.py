@@ -8,7 +8,6 @@ import time
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from ipaddress import ip_address
 from pathlib import Path
 import hmac
 
@@ -61,21 +60,37 @@ except Exception:
         normalize_subscription_merchant_name = _fallback_normalize_subscription_merchant  # type: ignore
         logging.exception("Subscription analysis unavailable: %s", exc)
 
+try:
+    from .transaction_rag import TransactionRAGPipeline
+except Exception:
+    try:
+        from transaction_rag import TransactionRAGPipeline  # type: ignore
+    except Exception:
+        TransactionRAGPipeline = None  # type: ignore
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 350 * 1024 * 1024  # 350MB max upload size
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Load environment before reading security configuration values.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(PROJECT_ROOT / "src" / "web" / ".env")
+load_dotenv()
+
 API_AUTH_TOKEN = (os.getenv('APP_API_TOKEN') or '').strip()
 MAX_JSON_BODY_BYTES = int(os.getenv('MAX_JSON_BODY_BYTES', str(5 * 1024 * 1024)))
 API_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('API_RATE_LIMIT_WINDOW_SECONDS', '60'))
 API_RATE_LIMIT_MAX_REQUESTS = int(os.getenv('API_RATE_LIMIT_MAX_REQUESTS', '120'))
-LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1'}
 PROTECTED_API_PATHS = {
     '/api/plaid-token',
     '/api/link-token',
     '/api/finance-tip',
     '/api/monthly-spend',
+    '/api/transactions-rag/query',
     '/api/apple-health/analyze',
 }
 _api_rate_buckets = defaultdict(deque)
@@ -83,8 +98,7 @@ _api_rate_lock = threading.Lock()
 
 if not API_AUTH_TOKEN:
     logging.warning(
-        "APP_API_TOKEN is not set. Protected APIs are restricted to loopback requests only. "
-        "Set APP_API_TOKEN for secure remote access."
+        "APP_API_TOKEN is not set. Protected APIs are disabled until APP_API_TOKEN is configured."
     )
 
 # LLM client
@@ -98,15 +112,6 @@ except Exception:
     except Exception:
         llm_categorize_transactions = None
         AVAILABLE_OPENAI_MODELS = ['gpt-5-mini-2025-08-07', 'gpt5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-# Ensure project .env files are loaded even when running from a different working dir (e.g., Replit).
-load_dotenv(PROJECT_ROOT / ".env")
-load_dotenv(PROJECT_ROOT / "src" / "web" / ".env")
-load_dotenv()
 
 parse_apple_health_export = None
 generate_apple_health_analysis = None
@@ -175,31 +180,6 @@ def get_client_ip():
     return request.remote_addr or ''
 
 
-def get_request_host():
-    host = (request.host or '').split(':', 1)[0].strip().lower()
-    return host
-
-
-def is_loopback_ip(ip_text):
-    try:
-        return ip_address(ip_text).is_loopback
-    except ValueError:
-        return False
-
-
-def is_local_request_without_proxy():
-    client_ip = get_client_ip()
-    if not is_loopback_ip(client_ip):
-        return False
-
-    request_host = get_request_host()
-    if request_host not in LOCAL_HOSTS:
-        return False
-
-    forwarded_for = (request.headers.get('X-Forwarded-For') or '').strip()
-    return not forwarded_for
-
-
 def extract_api_token():
     auth_header = (request.headers.get('Authorization') or '').strip()
     if auth_header.lower().startswith('bearer '):
@@ -254,18 +234,16 @@ def enforce_api_security():
     if request.path not in PROTECTED_API_PATHS:
         return None
 
-    provided_token = extract_api_token()
-    if API_AUTH_TOKEN:
-        if not provided_token or not hmac.compare_digest(provided_token, API_AUTH_TOKEN):
-            return api_error('Unauthorized API request. Provide a valid API token.', 401)
-        return None
+    if not API_AUTH_TOKEN:
+        return api_error(
+            'Protected API access is unavailable because APP_API_TOKEN is not configured on the server.',
+            503,
+        )
 
-    if is_local_request_without_proxy():
-        return None
-    return api_error(
-        'Protected API access is disabled for remote clients until APP_API_TOKEN is configured.',
-        403,
-    )
+    provided_token = extract_api_token()
+    if not provided_token or not hmac.compare_digest(provided_token, API_AUTH_TOKEN):
+        return api_error('Unauthorized API request. Provide a valid API token.', 401)
+    return None
 
 
 @app.errorhandler(Exception)
@@ -404,6 +382,13 @@ def cleanup_transaction_file(file_path):
 
 def load_transactions_from_request(data, default_lookback_days=90):
     """Load transactions from CSV upload, fresh Plaid fetch, or cached data."""
+    def as_bool(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+        return bool(value)
+
     try:
         lookback_days = int(data.get('lookback_days', default_lookback_days))
     except (TypeError, ValueError):
@@ -420,6 +405,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
     fetch_fresh = bool(data.get('fetch_fresh', False))
     use_csv = bool(data.get('use_csv', False))
     csv_data = data.get('csv_data', '')
+    fallback_to_all_when_lookback_empty = as_bool(data.get('fallback_to_all_when_lookback_empty', False))
     file_path = None
 
     if use_csv:
@@ -512,6 +498,28 @@ def load_transactions_from_request(data, default_lookback_days=90):
     ]
 
     if not filtered_transactions:
+        if fallback_to_all_when_lookback_empty:
+            all_transactions = sorted(
+                [transaction for transaction in transactions if transaction.get('datetime')],
+                key=lambda item: item.get('datetime', datetime.min),
+                reverse=True,
+            )
+            if all_transactions:
+                oldest_date = all_transactions[-1]['datetime'].strftime('%Y-%m-%d')
+                newest_date = all_transactions[0]['datetime'].strftime('%Y-%m-%d')
+                return {
+                    'success': True,
+                    'status_code': 200,
+                    'error': None,
+                    'transactions': all_transactions,
+                    'file_path': file_path,
+                    'lookback_days': lookback_days,
+                    'lookback_fallback_used': True,
+                    'lookback_fallback_message': (
+                        f'No transactions within the last {lookback_days} days. '
+                        f'Using all available transactions from {oldest_date} to {newest_date}.'
+                    ),
+                }
         return {
             'success': False,
             'status_code': 400,
@@ -529,6 +537,8 @@ def load_transactions_from_request(data, default_lookback_days=90):
         'transactions': filtered_transactions,
         'file_path': file_path,
         'lookback_days': lookback_days,
+        'lookback_fallback_used': False,
+        'lookback_fallback_message': '',
     }
 
 
@@ -647,6 +657,12 @@ def monthly_spend_page():
     return render_template('monthly_spend.html')
 
 
+@app.route('/rag')
+def rag_chat_page():
+    """Transaction RAG chatbot page."""
+    return render_template('rag_chat.html')
+
+
 @app.route('/health')
 def apple_health_page():
     """Apple Health upload and analysis page."""
@@ -745,6 +761,102 @@ def get_finance_tip():
     except Exception as e:
         logging.exception("Finance tip analysis failed")
         return api_error('Finance tip analysis failed.', 500)
+    finally:
+        cleanup_transaction_file(file_path)
+
+
+@app.route('/api/transactions-rag/query', methods=['POST'])
+def transactions_rag_query_api():
+    """Answer transaction questions using a local vector index persisted to disk."""
+    if not TransactionRAGPipeline:
+        return jsonify({'error': 'Transaction RAG pipeline is unavailable on this server.'}), 500
+
+    def as_bool(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+        return bool(value)
+
+    file_path = None
+    try:
+        data = get_request_json()
+        data = dict(data or {})
+        question = str(data.get('question') or data.get('query') or '').strip()
+        if not question:
+            return jsonify({'error': 'Provide a question in "question" or "query".'}), 400
+
+        try:
+            top_k = int(data.get('top_k', 8))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'top_k must be a whole number.'}), 400
+        top_k = max(1, min(top_k, 20))
+
+        use_llm = as_bool(data.get('use_llm', False))
+        force_reindex = as_bool(data.get('force_reindex', False))
+        use_openai = as_bool(data.get('use_openai', False))
+        openai_api_key = (data.get('openai_api_key') or '').strip()
+        model = (data.get('model') or '').strip() or None
+
+        vector_db_file = str(data.get('vector_db_file') or 'transactions_rag_vectors.sqlite3').strip()
+        vector_db_name = Path(vector_db_file).name or 'transactions_rag_vectors.sqlite3'
+        vector_db_path = PROJECT_ROOT / 'data' / vector_db_name
+
+        # RAG should still work for historical CSV/bank exports with older dates.
+        data['fallback_to_all_when_lookback_empty'] = True
+        load_result, error_response = load_transactions_or_error(data, default_lookback_days=365)
+        if error_response:
+            return error_response
+
+        file_path = load_result['file_path']
+        transactions = load_result['transactions']
+        lookback_days = load_result['lookback_days']
+        lookback_fallback_used = bool(load_result.get('lookback_fallback_used', False))
+        lookback_fallback_message = str(load_result.get('lookback_fallback_message') or '')
+
+        pipeline = TransactionRAGPipeline(vector_db_path=vector_db_path)
+        index_result = pipeline.build_or_refresh_index(
+            transactions,
+            force_rebuild=force_reindex,
+        )
+        if not index_result.get('success'):
+            return api_error(index_result.get('error') or 'Failed to index transactions.', 500)
+
+        answer_result = pipeline.ask(
+            query=question,
+            top_k=top_k,
+            use_llm=use_llm,
+            openai_api_key=openai_api_key,
+            use_openai=use_openai,
+            model=model,
+        )
+        if not answer_result.get('success'):
+            return api_error(answer_result.get('error') or 'Failed to answer question.', 500)
+
+        return jsonify(
+            {
+                'success': True,
+                'question': question,
+                'answer': answer_result.get('answer'),
+                'citations': answer_result.get('citations', []),
+                'confidence': answer_result.get('confidence', 'medium'),
+                'matches': answer_result.get('matches', []),
+                'match_count': len(answer_result.get('matches', [])),
+                'index_refreshed': index_result.get('indexed', False),
+                'indexed_documents': index_result.get('document_count', 0),
+                'vector_db_file': str(vector_db_path),
+                'lookback_days': lookback_days,
+                'lookback_fallback_used': lookback_fallback_used,
+                'lookback_fallback_message': lookback_fallback_message,
+                'use_llm': use_llm,
+                'llm_used': answer_result.get('llm_used', False),
+                'llm_error': answer_result.get('llm_error'),
+                'timestamp': datetime.now().isoformat(),
+            }
+        )
+    except Exception:
+        logging.exception("Transaction RAG query failed")
+        return api_error('Transaction RAG query failed.', 500)
     finally:
         cleanup_transaction_file(file_path)
 
