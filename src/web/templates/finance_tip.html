@@ -6,35 +6,53 @@
   <title>Finance Insights</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.plaid.com" />
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
     :root {
-      --bg: #0f0f12;
-      --bg-card: #18181f;
-      --bg-hover: #1f1f28;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.15);
-      --accent-light: #818cf8;
-      --text: #f4f4f5;
-      --text-muted: #71717a;
-      --text-dim: #52525b;
+      --bg: #0b1014;
+      --bg-card: #121920;
+      --bg-hover: #18222d;
+      --accent: #0f8bff;
+      --accent-glow: rgba(15, 139, 255, 0.16);
+      --accent-light: #4ea9ff;
+      --text: #f5f7fa;
+      --text-muted: #a3b1c2;
+      --text-dim: #6a7a8c;
       --success: #10b981;
       --warning: #f59e0b;
-      --error: #ef4444;
-      --border: #27272a;
-      --radius: 12px;
+      --error: #e11d48;
+      --border: #2a3440;
+      --radius: 14px;
     }
 
     * { box-sizing: border-box; }
 
     body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
       margin: 0;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+    }
+
+    h1, h2, h3, h4, .logo {
+      font-family: 'General Sans', 'Segoe UI', sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    code,
+    pre,
+    table,
+    th,
+    td,
+    .summary-value,
+    .list-item-value,
+    .shock-card-value {
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
     }
 
     /* Subtle gradient background */
@@ -193,12 +211,12 @@
     .btn-primary {
       background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
       color: white;
-      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 16px rgba(15, 139, 255, 0.32);
     }
 
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 6px 20px rgba(15, 139, 255, 0.42);
     }
 
     .btn-primary:disabled {
@@ -434,9 +452,9 @@
 
     .results-hero {
       background:
-        radial-gradient(circle at top left, rgba(129, 140, 248, 0.2), transparent 36%),
+        radial-gradient(circle at top left, rgba(15, 139, 255, 0.2), transparent 36%),
         linear-gradient(135deg, #191926 0%, #12121a 60%, #101017 100%);
-      border: 1px solid rgba(129, 140, 248, 0.18);
+      border: 1px solid rgba(15, 139, 255, 0.2);
       border-radius: 24px;
       padding: 28px;
       position: relative;
@@ -458,8 +476,8 @@
       gap: 8px;
       padding: 6px 12px;
       border-radius: 999px;
-      background: rgba(99, 102, 241, 0.14);
-      border: 1px solid rgba(129, 140, 248, 0.22);
+      background: rgba(15, 139, 255, 0.14);
+      border: 1px solid rgba(15, 139, 255, 0.24);
       color: var(--accent-light);
       font-size: 0.78rem;
       text-transform: uppercase;
@@ -497,7 +515,7 @@
       width: 52px;
       height: 52px;
       border-radius: 16px;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.24), rgba(16, 185, 129, 0.16));
+      background: linear-gradient(135deg, rgba(15, 139, 255, 0.22), rgba(16, 185, 129, 0.16));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -563,8 +581,8 @@
     }
 
     .summary-panel {
-      background: linear-gradient(160deg, rgba(99, 102, 241, 0.14), rgba(6, 182, 212, 0.08));
-      border: 1px solid rgba(129, 140, 248, 0.18);
+      background: linear-gradient(160deg, rgba(15, 139, 255, 0.14), rgba(16, 185, 129, 0.1));
+      border: 1px solid rgba(15, 139, 255, 0.2);
       border-radius: 20px;
       padding: 22px;
       display: grid;
@@ -722,7 +740,7 @@
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      background: rgba(99, 102, 241, 0.16);
+      background: rgba(15, 139, 255, 0.18);
       color: var(--accent-light);
       display: flex;
       align-items: center;
@@ -846,7 +864,7 @@
       left: 0;
       right: 0;
       height: 2px;
-      background: linear-gradient(90deg, #10b981, #06b6d4, #6366f1);
+      background: linear-gradient(90deg, #10b981, #0ea5e9, #0f8bff);
     }
 
     .signup-content {
