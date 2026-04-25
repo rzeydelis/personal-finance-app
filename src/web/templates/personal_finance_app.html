@@ -6,8 +6,10 @@
   <title>My Personal Finance App Main Preview</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.plaid.com" />
   <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
     :root {
       --bg: #0b1014;
@@ -693,7 +695,7 @@
         <a class="side-item" href="/monthly-spend"><span>Monthly Spend</span><strong>MO</strong></a>
         <a class="side-item" href="/rag"><span>RAG Chat</span><strong>Q&A</strong></a>
         <a class="side-item" href="/health"><span>Health</span><strong>NEW</strong></a>
-        <a class="side-item" href="/plaid-link"><span>Connect Bank</span><strong>SYNC</strong></a>
+        <a class="side-item" href="/main"><span>Connect Bank</span><strong>SYNC</strong></a>
         <a class="side-item active" href="/main"><span>Main Preview</span><strong>SPEC</strong></a>
       </aside>
 
@@ -842,6 +844,7 @@
     (function () {
       const SETTINGS_KEY = 'pfa_preview_settings_v1';
       const THEME_KEY = 'pfa_preview_theme';
+      const PLAID_USER_KEY = 'plaid_user_id';
 
       const modeToggle = document.getElementById('modeToggle');
       const lookbackDays = document.getElementById('lookbackDays');
@@ -854,10 +857,151 @@
       const sampleReportBtn = document.getElementById('sampleReportBtn');
       const saveSettingsBtn = document.getElementById('saveSettingsBtn');
       const testPlaidBtn = document.getElementById('testPlaidBtn');
+      let plaidLinkToken = null;
+      let plaidLinkTokenPromise = null;
+      let plaidLinkHandler = null;
 
       function setFeedback(message, type) {
         settingsFeedback.textContent = message || '';
         settingsFeedback.className = 'settings-feedback' + (type ? ' ' + type : '');
+      }
+
+      function getSessionUserId() {
+        let userId = sessionStorage.getItem(PLAID_USER_KEY);
+        if (!userId) {
+          const randomId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+            ? window.crypto.randomUUID()
+            : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+          userId = `web_user_${randomId}`;
+          sessionStorage.setItem(PLAID_USER_KEY, userId);
+        }
+        return userId;
+      }
+
+      async function readJsonResponse(resp) {
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return resp.json();
+        }
+
+        const text = await resp.text();
+        const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+        throw new Error(`Unexpected response (${resp.status} ${resp.statusText}): ${snippet || 'empty body'}`);
+      }
+
+      async function ensurePlaidLinkToken(options) {
+        const forceRefresh = Boolean(options && options.forceRefresh);
+        const silent = Boolean(options && options.silent);
+
+        if (plaidLinkToken && !forceRefresh) {
+          return plaidLinkToken;
+        }
+
+        if (plaidLinkTokenPromise && !forceRefresh) {
+          return plaidLinkTokenPromise;
+        }
+
+        if (!silent) {
+          setFeedback('Preparing secure Plaid connection...', '');
+        }
+
+        plaidLinkTokenPromise = (async function () {
+          const resp = await fetch('/api/link-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: getSessionUserId() })
+          });
+          const data = await readJsonResponse(resp);
+
+          if (!resp.ok || !data.link_token) {
+            throw new Error(data.error || 'Failed to initialize Plaid Link.');
+          }
+
+          plaidLinkToken = data.link_token;
+          return plaidLinkToken;
+        })();
+
+        try {
+          return await plaidLinkTokenPromise;
+        } catch (err) {
+          plaidLinkToken = null;
+          if (!silent) {
+            setFeedback(err.message || 'Failed to initialize Plaid Link.', 'error');
+          }
+          throw err;
+        } finally {
+          plaidLinkTokenPromise = null;
+        }
+      }
+
+      function createPlaidHandler() {
+        if (!window.Plaid || typeof window.Plaid.create !== 'function') {
+          throw new Error('Plaid failed to load. Check your connection.');
+        }
+
+        if (!plaidLinkToken) {
+          throw new Error('Plaid Link is still initializing. Try again in a moment.');
+        }
+
+        if (plaidLinkHandler && typeof plaidLinkHandler.destroy === 'function') {
+          plaidLinkHandler.destroy();
+        }
+
+        plaidLinkHandler = window.Plaid.create({
+          token: plaidLinkToken,
+          onSuccess: handlePlaidSuccess,
+          onExit: function (err) {
+            if (err) {
+              setFeedback(`Connection cancelled: ${err.error_message || 'Unknown error'}`, 'error');
+              return;
+            }
+            setFeedback('', '');
+          }
+        });
+
+        return plaidLinkHandler;
+      }
+
+      async function handlePlaidSuccess(publicToken, metadata) {
+        const institution = (metadata && metadata.institution && metadata.institution.name) || 'your bank';
+        setFeedback(`Connecting to ${institution}...`, '');
+
+        try {
+          const payload = { public_token: publicToken };
+          if (metadata && metadata.item_id) {
+            payload.item_id = metadata.item_id;
+          }
+
+          const resp = await fetch('/api/plaid-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await readJsonResponse(resp);
+
+          if (!resp.ok || !data.success) {
+            throw new Error(data.error || 'Connection failed.');
+          }
+
+          setFeedback(`Successfully connected to ${institution}.`, 'success');
+          plaidLinkToken = null;
+          ensurePlaidLinkToken({ forceRefresh: true, silent: true }).catch(function () {});
+        } catch (err) {
+          setFeedback(err.message || 'Failed to store Plaid token.', 'error');
+        }
+      }
+
+      async function launchPlaidLink() {
+        testPlaidBtn.disabled = true;
+
+        try {
+          await ensurePlaidLinkToken();
+          setFeedback('Opening Plaid Link...', '');
+          const handler = createPlaidHandler();
+          handler.open();
+        } finally {
+          testPlaidBtn.disabled = false;
+        }
       }
 
       function applyTheme(theme) {
@@ -919,11 +1063,14 @@
       });
 
       testPlaidBtn.addEventListener('click', function () {
-        window.location.href = '/plaid-link';
+        launchPlaidLink().catch(function (err) {
+          setFeedback(err.message || 'Unable to open Plaid Link.', 'error');
+        });
       });
 
       applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
       loadSavedSettings();
+      ensurePlaidLinkToken({ silent: true }).catch(function () {});
     })();
   </script>
 </body>

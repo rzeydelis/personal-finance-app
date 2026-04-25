@@ -14,6 +14,7 @@ import hmac
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException
 
 from finance_tip import MAX_TIP_TRANSACTIONS, generate_finance_tip
 from utils import parse_csv_transactions
@@ -180,6 +181,21 @@ def get_client_ip():
     return request.remote_addr or ''
 
 
+def is_local_request_without_proxy():
+    """Allow localhost dev requests only when they are not proxied."""
+    forwarded = (
+        request.headers.get('X-Forwarded-For')
+        or request.headers.get('X-Forwarded-Host')
+        or request.headers.get('X-Forwarded-Proto')
+        or request.headers.get('Forwarded')
+    )
+    if forwarded:
+        return False
+
+    client_ip = get_client_ip().strip().lower()
+    return client_ip in {'127.0.0.1', '::1', 'localhost'}
+
+
 def extract_api_token():
     auth_header = (request.headers.get('Authorization') or '').strip()
     if auth_header.lower().startswith('bearer '):
@@ -235,6 +251,8 @@ def enforce_api_security():
         return None
 
     if not API_AUTH_TOKEN:
+        if is_local_request_without_proxy():
+            return None
         return api_error(
             'Protected API access is unavailable because APP_API_TOKEN is not configured on the server.',
             503,
@@ -249,6 +267,8 @@ def enforce_api_security():
 @app.errorhandler(Exception)
 def handle_unexpected_error(exc):
     """Return JSON for API routes and log the full exception."""
+    if isinstance(exc, HTTPException):
+        return exc
     logging.exception("Unhandled error on %s %s", request.method, request.path)
     if request.path.startswith('/api'):
         return api_error('Internal server error.', 500)
@@ -685,12 +705,6 @@ def rag_chat_page():
 def apple_health_page():
     """Apple Health upload and analysis page."""
     return render_template('apple_health.html')
-
-
-@app.route('/plaid-link')
-def plaid_link_page():
-    """Helper page to run Plaid Link and capture tokens."""
-    return render_template('plaid_link.html')
 
 
 @app.route('/api/apple-health/analyze', methods=['POST'])

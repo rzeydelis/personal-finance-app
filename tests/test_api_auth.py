@@ -17,7 +17,11 @@ def test_protected_api_fails_closed_without_token_config(monkeypatch):
     app_module = _load_app_module(monkeypatch, "")
     client = app_module.app.test_client()
 
-    response = client.post("/api/link-token", json={})
+    response = client.post(
+        "/api/link-token",
+        json={},
+        headers={"X-Forwarded-For": "198.51.100.10"},
+    )
     payload = response.get_json() or {}
 
     assert response.status_code == 503
@@ -45,4 +49,25 @@ def test_protected_api_requires_valid_token_and_allows_valid_header(monkeypatch)
     payload = authorized.get_json() or {}
 
     assert authorized.status_code == 200
+    assert payload.get("link_token") == "link-sandbox-token"
+
+
+def test_protected_api_allows_loopback_without_token_when_not_proxied(monkeypatch):
+    app_module = _load_app_module(monkeypatch, "")
+
+    class _DummyPipeline:
+        def create_link_token(self, user_id):
+            return "link-sandbox-token"
+
+    app_module.get_bank_pipeline = lambda: _DummyPipeline()
+    client = app_module.app.test_client()
+
+    local_response = client.post(
+        "/api/link-token",
+        json={"user_id": "u-1"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    payload = local_response.get_json() or {}
+
+    assert local_response.status_code == 200
     assert payload.get("link_token") == "link-sandbox-token"
