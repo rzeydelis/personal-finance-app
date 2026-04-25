@@ -119,8 +119,8 @@ def generate_json(
 
     Returns a dict: { success: bool, data: Any, raw_text: str, error: Optional[str] }
     """
-    # Determine if we should use OpenAI
-    should_use_openai = use_openai or openai_api_key or OPENAI_API_KEY
+    # Only use OpenAI when the caller explicitly opts in.
+    should_use_openai = bool(use_openai)
     
     if should_use_openai:
         # Use OpenAI API

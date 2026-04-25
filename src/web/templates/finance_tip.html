@@ -469,6 +469,31 @@
       white-space: normal;
     }
 
+    .results-meta {
+      display: none;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .results-meta.visible {
+      display: flex;
+    }
+
+    .results-meta-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
     .results-hero-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
@@ -1186,6 +1211,10 @@
               </div>
             </div>
           </div>
+          <div class="results-meta" id="resultsMeta">
+            <div class="results-meta-note" id="analysisModeNote"></div>
+            <div class="results-meta-note" id="analysisCoverageNote"></div>
+          </div>
         </div>
 
         <div class="story-grid" id="storyGrid"></div>
@@ -1513,6 +1542,22 @@
       `).join('');
     }
 
+    function renderAnalysisMeta(data = {}) {
+      const container = document.getElementById('resultsMeta');
+      const modeNote = document.getElementById('analysisModeNote');
+      const coverageNote = document.getElementById('analysisCoverageNote');
+      const provider = data.analysis_provider === 'openai' ? 'OpenAI cloud analysis' : 'Local Ollama analysis';
+      const analyzedCount = Number(data.analyzed_transaction_count || 0);
+      const transactionCount = Number(data.transaction_count || 0);
+      const lookbackDays = Number(data.lookback_days || 0);
+
+      modeNote.textContent = provider;
+      coverageNote.textContent = data.analysis_limited
+        ? `AI insight used ${analyzedCount} of ${transactionCount} transactions in the ${lookbackDays}-day window.`
+        : `AI insight used all ${analyzedCount || transactionCount} transactions in the ${lookbackDays}-day window.`;
+      container.classList.add('visible');
+    }
+
     function populateSummary(summary = {}, insights = {}, lookbackDays = 90) {
       setElementText('resultsTopline', insights.mind_blown_moment || 'Financial X-Ray');
       setElementText('summarySpendValue', summary.total_spend?.display || '--');
@@ -1567,6 +1612,7 @@
       btn.disabled = true;
       copyBtn.disabled = true;
       results.classList.remove('visible');
+      document.getElementById('resultsMeta').classList.remove('visible');
       showStatus('loading', 'Analyzing your transactions...');
 
       try {
@@ -1611,6 +1657,7 @@
         `).join('') || '<li><span class="step-text">No steps provided.</span></li>';
 
         populateSummary(summary, insights, data.lookback_days);
+        renderAnalysisMeta(data);
 
         hideStatus();
         results.classList.add('visible');

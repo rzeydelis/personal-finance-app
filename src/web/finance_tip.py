@@ -83,17 +83,53 @@ Expanded Analysis Rules (including month-over-month support)
 
 def generate_finance_tip(transactions, openai_api_key=None, use_openai=False, model=None):
     """Generate a personalized finance tip using an LLM."""
-    if not llm_generate_json:
-        return {'success': False, 'analysis': {}, 'error': 'LLM not available'}
-
+    provider = 'openai' if use_openai else 'local'
     limited_transactions = transactions[:MAX_TIP_TRANSACTIONS]
+    analyzed_count = len(limited_transactions)
+    truncated = len(transactions) > analyzed_count
+
+    if not llm_generate_json:
+        return {
+            'success': False,
+            'analysis': {},
+            'error': 'LLM not available',
+            'provider': provider,
+            'total_processed': analyzed_count,
+            'analysis_limit': MAX_TIP_TRANSACTIONS,
+            'truncated': truncated,
+        }
+
     prompt = _build_finance_tip_prompt(_transactions_to_csv(limited_transactions))
 
     try:
         result = llm_generate_json(prompt, model=model, openai_api_key=openai_api_key, use_openai=use_openai)
     except Exception as exc:
-        return {'success': False, 'analysis': {}, 'error': str(exc)}
+        return {
+            'success': False,
+            'analysis': {},
+            'error': str(exc),
+            'provider': provider,
+            'total_processed': analyzed_count,
+            'analysis_limit': MAX_TIP_TRANSACTIONS,
+            'truncated': truncated,
+        }
 
     if result.get('success'):
-        return {'success': True, 'analysis': result.get('data', {}), 'error': None}
-    return {'success': False, 'analysis': {}, 'error': result.get('error', 'Unknown error')}
+        return {
+            'success': True,
+            'analysis': result.get('data', {}),
+            'error': None,
+            'provider': provider,
+            'total_processed': analyzed_count,
+            'analysis_limit': MAX_TIP_TRANSACTIONS,
+            'truncated': truncated,
+        }
+    return {
+        'success': False,
+        'analysis': {},
+        'error': result.get('error', 'Unknown error'),
+        'provider': provider,
+        'total_processed': analyzed_count,
+        'analysis_limit': MAX_TIP_TRANSACTIONS,
+        'truncated': truncated,
+    }

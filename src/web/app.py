@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from finance_tip import generate_finance_tip
+from finance_tip import MAX_TIP_TRANSACTIONS, generate_finance_tip
 from utils import parse_csv_transactions
 try:
     from .transaction_insights import (
@@ -294,7 +294,8 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data:; "
-        "connect-src 'self' https://api.openai.com http://localhost:11434 https://localhost:11434; "
+        "connect-src 'self' https://api.openai.com http://localhost:11434 https://localhost:11434 https://cdn.plaid.com https://*.plaid.com; "
+        "frame-src 'self' https://cdn.plaid.com https://*.plaid.com; "
         "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     )
     response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -391,9 +392,9 @@ def parse_transaction_file(file_path):
         return {'success': False, 'transactions': [], 'count': 0, 'error': 'Failed to parse transaction file.'}
 
 
-def cleanup_transaction_file(file_path):
+def cleanup_transaction_file(file_path, should_cleanup=False):
     """Delete a temporary transaction file if one was created for the request."""
-    if not file_path or file_path == 'uploaded_csv':
+    if not should_cleanup or not file_path or file_path == 'uploaded_csv':
         return
     try:
         Path(file_path).unlink(missing_ok=True)
@@ -413,6 +414,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
             'error': 'Lookback days must be a whole number.',
             'transactions': [],
             'file_path': None,
+            'cleanup_after_request': False,
             'lookback_days': default_lookback_days,
         }
 
@@ -430,6 +432,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': 'Upload a CSV file before running the analysis.',
                 'transactions': [],
                 'file_path': None,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
 
@@ -442,6 +445,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': f'Failed to parse CSV: {parse_result["error"]}',
                 'transactions': [],
                 'file_path': None,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
         file_path = 'uploaded_csv'
@@ -455,6 +459,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': f'Failed to fetch transactions: {fetch_result["error"]}',
                 'transactions': [],
                 'file_path': None,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
         file_path = fetch_result['file_path']
@@ -467,6 +472,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': f'Failed to parse transactions: {parse_result["error"]}',
                 'transactions': [],
                 'file_path': file_path,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
     else:
@@ -479,6 +485,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': 'No cached transactions found. Try checking "Fetch fresh data" to download from your bank.',
                 'transactions': [],
                 'file_path': None,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
         file_path = fetch_result['file_path']
@@ -491,6 +498,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
                 'error': f'Failed to parse transactions: {parse_result["error"]}',
                 'transactions': [],
                 'file_path': file_path,
+                'cleanup_after_request': False,
                 'lookback_days': lookback_days,
             }
 
@@ -502,6 +510,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
             'error': 'No transactions found.',
             'transactions': [],
             'file_path': file_path,
+            'cleanup_after_request': False,
             'lookback_days': lookback_days,
         }
 
@@ -518,6 +527,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
             'error': 'No transactions within lookback window.',
             'transactions': [],
             'file_path': file_path,
+            'cleanup_after_request': False,
             'lookback_days': lookback_days,
         }
 
@@ -528,6 +538,7 @@ def load_transactions_from_request(data, default_lookback_days=90):
         'error': None,
         'transactions': filtered_transactions,
         'file_path': file_path,
+        'cleanup_after_request': False,
         'lookback_days': lookback_days,
     }
 
@@ -717,6 +728,7 @@ def analyze_apple_health_api():
 def get_finance_tip():
     """Generate personalized finance tip"""
     file_path = None
+    cleanup_after_request = False
     try:
         data = get_request_json()
         openai_api_key = data.get('openai_api_key', '')
@@ -727,26 +739,42 @@ def get_finance_tip():
             return error_response
 
         file_path = load_result['file_path']
+        cleanup_after_request = load_result.get('cleanup_after_request', False)
         lookback_days = load_result['lookback_days']
         transactions = load_result['transactions']
-        tip_result = generate_finance_tip(transactions, openai_api_key=openai_api_key, use_openai=use_openai, model=model)
+        tip_result = generate_finance_tip(
+            transactions,
+            openai_api_key=openai_api_key,
+            use_openai=use_openai,
+            model=model,
+        )
         transaction_summary = build_transaction_summary(transactions, lookback_days)
-        response_success = tip_result['success'] or bool(transaction_summary)
-
-        return jsonify({
-            'success': response_success,
+        analyzed_transaction_count = tip_result.get('total_processed', min(len(transactions), MAX_TIP_TRANSACTIONS))
+        analysis_limit = tip_result.get('analysis_limit', MAX_TIP_TRANSACTIONS)
+        analysis_limited = tip_result.get('truncated', len(transactions) > analyzed_transaction_count)
+        response_payload = {
+            'success': bool(tip_result.get('success')),
             'transaction_count': len(transactions),
+            'analyzed_transaction_count': analyzed_transaction_count,
+            'analysis_limit': analysis_limit,
+            'analysis_limited': analysis_limited,
+            'analysis_provider': tip_result.get('provider', 'openai' if use_openai else 'local'),
             'lookback_days': lookback_days,
             'tip_analysis': tip_result.get('analysis', {}),
             'transaction_summary': transaction_summary,
             'error': tip_result.get('error'),
-            'timestamp': datetime.now().isoformat()
-        })
+            'timestamp': datetime.now().isoformat(),
+        }
+
+        if not tip_result.get('success'):
+            return jsonify(response_payload), 502
+
+        return jsonify(response_payload)
     except Exception as e:
         logging.exception("Finance tip analysis failed")
         return api_error('Finance tip analysis failed.', 500)
     finally:
-        cleanup_transaction_file(file_path)
+        cleanup_transaction_file(file_path, should_cleanup=cleanup_after_request)
 
 
 # ==================== EMAIL SIGNUP ====================
@@ -832,6 +860,7 @@ def monthly_spend_api():
         return jsonify({'error': 'LLM categorization not available'}), 500
 
     file_path = None
+    cleanup_after_request = False
     try:
         data = get_request_json()
         requested_month = str(data.get('month') or '').strip()
@@ -846,6 +875,7 @@ def monthly_spend_api():
             return error_response
 
         file_path = load_result['file_path']
+        cleanup_after_request = load_result.get('cleanup_after_request', False)
         lookback_days = load_result['lookback_days']
         transactions = load_result['transactions']
 
@@ -1098,7 +1128,7 @@ def monthly_spend_api():
         logging.exception("Monthly spend analysis failed")
         return api_error('Monthly spend analysis failed.', 500)
     finally:
-        cleanup_transaction_file(file_path)
+        cleanup_transaction_file(file_path, should_cleanup=cleanup_after_request)
 
 
 if __name__ == '__main__':
