@@ -6,33 +6,47 @@
   <title>Apple Health Analysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f0f12;
-      --bg-card: #18181f;
-      --bg-hover: #1f1f28;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.15);
-      --accent-light: #818cf8;
-      --text: #f4f4f5;
-      --text-muted: #71717a;
-      --text-dim: #52525b;
+      --bg: #0b1014;
+      --bg-card: #121920;
+      --bg-hover: #18222d;
+      --accent: #0f8bff;
+      --accent-glow: rgba(15, 139, 255, 0.16);
+      --accent-light: #4ea9ff;
+      --text: #f5f7fa;
+      --text-muted: #a3b1c2;
+      --text-dim: #6a7a8c;
       --success: #10b981;
       --warning: #f59e0b;
-      --error: #ef4444;
-      --border: #27272a;
-      --radius: 12px;
+      --error: #e11d48;
+      --border: #2a3440;
+      --radius: 14px;
     }
 
     * { box-sizing: border-box; }
 
     body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
       margin: 0;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+    }
+
+    h1, h2, h3, h4, .logo {
+      font-family: 'General Sans', 'Segoe UI', sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    .stat-value,
+    .metric-value,
+    code,
+    pre {
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
     }
 
     body::before {
@@ -118,7 +132,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), transparent 55%);
+      background: linear-gradient(135deg, rgba(15, 139, 255, 0.16), transparent 55%);
       pointer-events: none;
     }
 
@@ -298,12 +312,12 @@
     .btn-primary {
       background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
       color: white;
-      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 16px rgba(15, 139, 255, 0.32);
     }
 
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 6px 20px rgba(15, 139, 255, 0.42);
     }
 
     .btn-secondary {
@@ -517,9 +531,10 @@
       display: block;
       white-space: pre-wrap;
       word-break: break-word;
-      font-family: Consolas, 'SF Mono', Monaco, monospace;
+      font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
       color: var(--text);
       font-size: 0.84rem;
+      font-variant-numeric: tabular-nums;
     }
 
     @media (max-width: 960px) {
