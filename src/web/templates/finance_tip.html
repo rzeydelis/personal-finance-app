@@ -14,6 +14,7 @@
     :root {
       --bg: #0b1014;
       --bg-card: #121920;
+      --bg-elevated: #18222d;
       --bg-hover: #18222d;
       --accent: #0f8bff;
       --accent-glow: rgba(15, 139, 255, 0.16);
@@ -26,6 +27,24 @@
       --error: #e11d48;
       --border: #2a3440;
       --radius: 14px;
+      --radius-sm: 10px;
+      --radius-lg: 20px;
+      --content-max: 1200px;
+      --content-flow: 24px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f7fa;
+        --bg-card: #ffffff;
+        --bg-elevated: #eef3f8;
+        --bg-hover: #e4ecf5;
+        --accent-glow: rgba(15, 139, 255, 0.1);
+        --text: #121920;
+        --text-muted: #2a3440;
+        --text-dim: #6a7a8c;
+        --border: #dde4ec;
+      }
     }
 
     * { box-sizing: border-box; }
@@ -70,13 +89,29 @@
 
     .app { position: relative; z-index: 1; }
 
+    a,
+    button,
+    input,
+    select {
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent-light);
+      outline-offset: 2px;
+    }
+
     /* Navigation */
     nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 24px;
-      max-width: 960px;
+      gap: 16px;
+      padding: 20px var(--content-flow) 16px;
+      max-width: var(--content-max);
       margin: 0 auto;
     }
 
@@ -105,8 +140,10 @@
       gap: 4px;
       background: var(--bg-card);
       padding: 4px;
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .nav-links a {
@@ -124,14 +161,15 @@
 
     /* Main content */
     main {
-      max-width: 960px;
+      max-width: var(--content-max);
       margin: 0 auto;
-      padding: 0 24px 60px;
+      padding: 0 var(--content-flow) 60px;
     }
 
     .hero {
-      text-align: center;
-      padding: 40px 0 32px;
+      text-align: left;
+      padding: 44px 0 32px;
+      max-width: 760px;
     }
 
     .hero h1 {
@@ -148,6 +186,7 @@
       color: var(--text-muted);
       margin: 0;
       font-size: 1rem;
+      line-height: 1.55;
     }
 
     /* Cards */
@@ -155,7 +194,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: 20px;
       margin-bottom: 16px;
     }
 
@@ -176,14 +215,18 @@
     }
 
     .card-title .icon {
-      width: 20px;
+      min-width: 28px;
       height: 20px;
-      background: var(--accent-glow);
+      padding: 0 6px;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     /* Action section */
@@ -268,6 +311,11 @@
       width: 60px;
       padding: 8px 0;
       outline: none;
+    }
+
+    .input-group input[type="number"]::-webkit-outer-spin-button,
+    .input-group input[type="number"]::-webkit-inner-spin-button {
+      opacity: 1;
     }
 
     .toggle {
@@ -367,6 +415,11 @@
       color: var(--text-muted);
       font-size: 0.9rem;
       padding: 8px 0;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      font-family: inherit;
+      text-align: left;
     }
 
     .collapsible-trigger:hover { color: var(--text); }
@@ -392,6 +445,7 @@
     }
 
     .source-tab {
+      appearance: none;
       flex: 1;
       padding: 12px 16px;
       background: var(--bg);
@@ -399,6 +453,8 @@
       border-radius: 10px;
       cursor: pointer;
       text-align: center;
+      font-family: inherit;
+      color: inherit;
       transition: all 0.2s;
     }
 
@@ -409,7 +465,22 @@
       border-color: var(--accent);
     }
 
-    .source-tab .tab-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .source-tab .tab-icon {
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 22px;
+      padding: 0 6px;
+      margin-bottom: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      color: var(--text);
+    }
     .source-tab .tab-label { font-size: 0.85rem; color: var(--text-muted); }
     .source-tab.active .tab-label { color: var(--text); }
 
@@ -428,7 +499,28 @@
       background: var(--accent-glow);
     }
 
-    .file-drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .file-drop:focus-visible {
+      outline: 2px solid var(--accent-light);
+      outline-offset: 2px;
+    }
+
+    .file-drop-icon {
+      margin-bottom: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
     .file-drop-text { color: var(--text-muted); font-size: 0.9rem; }
     .file-drop-text strong { color: var(--accent-light); }
 
@@ -445,6 +537,23 @@
     .file-info.visible { display: flex; }
     .file-info .file-name { flex: 1; font-size: 0.9rem; }
     .file-info .file-status { color: var(--success); font-size: 0.85rem; }
+
+    .file-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 40px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
     /* Results section */
     .results { display: none; margin-bottom: 28px; }
@@ -522,9 +631,9 @@
     }
 
     .tip-card {
-      background: rgba(15, 15, 18, 0.64);
+      background: color-mix(in srgb, var(--bg-card) 86%, transparent);
       border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 20px;
+      border-radius: var(--radius-lg);
       padding: 24px;
       backdrop-filter: blur(12px);
     }
@@ -608,7 +717,7 @@
     .summary-panel {
       background: linear-gradient(160deg, rgba(15, 139, 255, 0.14), rgba(16, 185, 129, 0.1));
       border: 1px solid rgba(15, 139, 255, 0.2);
-      border-radius: 20px;
+      border-radius: var(--radius-lg);
       padding: 22px;
       display: grid;
       gap: 14px;
@@ -875,7 +984,7 @@
 
     /* Email Signup Section */
     .signup-card {
-      background: linear-gradient(135deg, #1a1a24 0%, var(--bg-card) 100%);
+      background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
       border: 1px solid var(--border);
       position: relative;
       overflow: hidden;
@@ -907,7 +1016,11 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       flex-shrink: 0;
     }
 
@@ -1034,34 +1147,161 @@
     }
 
     .feature-icon {
-      font-size: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 30px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 36%, transparent);
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
     }
 
-    /* Responsive */
-    @media (max-width: 640px) {
-      nav { padding: 12px 16px; }
-      main { padding: 0 16px 40px; }
-      .hero h1 { font-size: 1.5rem; }
-      .action-row { flex-direction: column; }
-      .action-row .btn { width: 100%; justify-content: center; }
-      .source-tabs { flex-direction: column; }
-      .results-hero { padding: 20px; border-radius: 20px; }
-      .results-hero-grid { grid-template-columns: 1fr; }
-      .shock-grid { grid-template-columns: 1fr; }
-      .list-item { grid-template-columns: auto minmax(0, 1fr); }
-      .list-item-value { grid-column: 2; text-align: left; }
-      .signup-content { flex-direction: column; gap: 12px; }
-      .signup-fields { flex-direction: column; }
-      .signup-input { min-width: 100%; }
-      .btn-signup { width: 100%; justify-content: center; }
+    @media (max-width: 768px) {
+      nav {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px 16px 12px;
+      }
+
+      .nav-links {
+        justify-content: flex-start;
+      }
+
+      main {
+        padding: 0 16px 40px;
+      }
+
+      .hero {
+        padding-top: 24px;
+      }
+
+      .hero h1 {
+        font-size: 1.75rem;
+      }
+
+      .action-row {
+        flex-direction: column;
+      }
+
+      .action-row .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .source-tabs {
+        flex-direction: column;
+      }
+
+      .results-hero {
+        padding: 20px;
+        border-radius: 20px;
+      }
+
+      .results-hero-grid,
+      .story-grid,
+      .insights-grid,
+      .lists-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .shock-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .list-item {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .list-item-value {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .signup-content {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .signup-fields {
+        flex-direction: column;
+      }
+
+      .signup-input {
+        min-width: 100%;
+      }
+
+      .btn-signup {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 375px) {
+      .hero h1 {
+        font-size: 1.5rem;
+      }
+
+      .card,
+      .results-hero,
+      .tip-card,
+      .summary-panel,
+      .insight-card,
+      .story-card,
+      .list-panel,
+      .steps-section {
+        padding: 16px;
+      }
+
+      .results-topline {
+        letter-spacing: 0.12em;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .card {
+        padding: 24px;
+      }
+
+      .hero h1 {
+        font-size: 2.25rem;
+      }
+
+      .results {
+        gap: 18px;
+      }
+    }
+
+    @media (min-width: 1440px) {
+      .hero h1 {
+        font-size: 2.5rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <nav>
+    <nav aria-label="Primary navigation">
       <div class="logo">
-        <span>Pluto Finance</span>
+        <span>My Personal Finance App</span>
       </div>
       <div class="nav-links">
         <a href="/" class="active">Insights</a>
@@ -1082,20 +1322,20 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <div class="icon">📊</div>
+            <div class="icon">Data</div>
             Choose Data Source
           </div>
         </div>
 
         <div class="source-tabs">
-          <div class="source-tab active" onclick="selectSource('bank')" id="tabBank">
-            <div class="tab-icon">🏦</div>
+          <button type="button" class="source-tab active" onclick="selectSource('bank')" id="tabBank" aria-pressed="true">
+            <div class="tab-icon">BANK</div>
             <div class="tab-label">Connected Bank</div>
-          </div>
-          <div class="source-tab" onclick="selectSource('csv')" id="tabCSV">
-            <div class="tab-icon">📄</div>
+          </button>
+          <button type="button" class="source-tab" onclick="selectSource('csv')" id="tabCSV" aria-pressed="false">
+            <div class="tab-icon">CSV</div>
             <div class="tab-label">Upload CSV</div>
-          </div>
+          </button>
         </div>
 
         <!-- Bank source options -->
@@ -1115,8 +1355,8 @@
 
         <!-- CSV source options -->
         <div id="csvSource" style="display: none;">
-          <div class="file-drop" onclick="document.getElementById('csvInput').click()" id="fileDrop">
-            <div class="file-drop-icon">📁</div>
+          <div class="file-drop" onclick="document.getElementById('csvInput').click()" id="fileDrop" role="button" tabindex="0" aria-label="Upload CSV file">
+            <div class="file-drop-icon">CSV</div>
             <div class="file-drop-text">
               <strong>Click to upload</strong> or drag and drop<br>
               CSV file with date, name, and amount columns
@@ -1124,19 +1364,19 @@
           </div>
           <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
           <div class="file-info" id="fileInfo">
-            <span>📄</span>
+            <span class="file-chip">CSV</span>
             <span class="file-name" id="fileName"></span>
-            <span class="file-status">✓ Ready</span>
-            <button class="btn-ghost" onclick="clearFile()">✕</button>
+            <span class="file-status">Ready</span>
+            <button type="button" class="btn-ghost" onclick="clearFile()">Clear</button>
           </div>
         </div>
 
         <!-- Advanced Settings -->
         <div class="collapsible">
-          <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
-            <span>⚙️ AI Settings</span>
-            <span class="arrow">▼</span>
-          </div>
+          <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)" aria-expanded="false">
+            <span>AI Settings</span>
+            <span class="arrow">v</span>
+          </button>
           <div class="collapsible-content">
             <div style="margin-bottom: 16px;">
               <label class="toggle">
@@ -1169,10 +1409,10 @@
             Generate Mind-Blowing Insights
           </button>
           <button class="btn btn-secondary" id="copyBtn" onclick="copyTip()" disabled>
-            📋 Copy
+            Copy Tip
           </button>
         </div>
-        <div class="status" id="status">
+        <div class="status" id="status" role="status" aria-live="polite">
           <div class="spinner"></div>
           <span id="statusText">Analyzing your transactions...</span>
         </div>
@@ -1267,12 +1507,12 @@
       <!-- Email Signup Section -->
       <div class="card signup-card">
         <div class="signup-content">
-          <div class="signup-icon">🚀</div>
+          <div class="signup-icon">HOST</div>
           <div class="signup-text">
             <h2 class="signup-title">Want us to handle everything?</h2>
             <p class="signup-description">
-              Join the waitlist for our <strong>hosted service</strong> — we run the AI analysis for you with 
-              <span class="privacy-badge">🔒 zero data storage</span>. Your financial data is processed in real-time and never stored on our servers.
+              Join the waitlist for our <strong>hosted service</strong> - we run the AI analysis for you with 
+              <span class="privacy-badge">zero data storage</span>. Your financial data is processed in real-time and never stored on our servers.
             </p>
           </div>
         </div>
@@ -1296,24 +1536,24 @@
               Join Waitlist
             </button>
           </div>
-          <div class="signup-status" id="signupStatus"></div>
+          <div class="signup-status" id="signupStatus" role="status" aria-live="polite"></div>
         </form>
         
         <div class="signup-features">
           <div class="feature-item">
-            <span class="feature-icon">⚡</span>
+            <span class="feature-icon">FAST</span>
             <span>Instant analysis</span>
           </div>
           <div class="feature-item">
-            <span class="feature-icon">🔐</span>
+            <span class="feature-icon">PRIV</span>
             <span>Privacy-first</span>
           </div>
           <div class="feature-item">
-            <span class="feature-icon">🏦</span>
+            <span class="feature-icon">SAFE</span>
             <span>Bank-grade security</span>
           </div>
           <div class="feature-item">
-            <span class="feature-icon">🗑️</span>
+            <span class="feature-icon">DEL</span>
             <span>Data deleted after processing</span>
           </div>
         </div>
@@ -1356,15 +1596,20 @@
 
     function selectSource(source) {
       currentSource = source;
-      document.getElementById('tabBank').classList.toggle('active', source === 'bank');
-      document.getElementById('tabCSV').classList.toggle('active', source === 'csv');
+      const bankTab = document.getElementById('tabBank');
+      const csvTab = document.getElementById('tabCSV');
+      bankTab.classList.toggle('active', source === 'bank');
+      csvTab.classList.toggle('active', source === 'csv');
+      bankTab.setAttribute('aria-pressed', source === 'bank' ? 'true' : 'false');
+      csvTab.setAttribute('aria-pressed', source === 'csv' ? 'true' : 'false');
       document.getElementById('bankSource').style.display = source === 'bank' ? 'block' : 'none';
       document.getElementById('csvSource').style.display = source === 'csv' ? 'block' : 'none';
     }
 
     function toggleCollapsible(trigger) {
-      trigger.classList.toggle('open');
-      trigger.nextElementSibling.classList.toggle('open');
+      const isOpen = trigger.classList.toggle('open');
+      trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      trigger.nextElementSibling.classList.toggle('open', isOpen);
     }
 
     function toggleOpenAI(checked) {
@@ -1375,6 +1620,12 @@
 
     function setupDragDrop() {
       const drop = document.getElementById('fileDrop');
+      drop.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          document.getElementById('csvInput').click();
+        }
+      });
       ['dragenter', 'dragover'].forEach(e => {
         drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('dragover'); });
       });

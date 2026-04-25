@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Personal Finance App Main Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1014;
+      --bg-card: #121920;
+      --bg-elevated: #18222d;
+      --bg-hover: #223040;
+      --accent: #0f8bff;
+      --accent-light: #4ea9ff;
+      --accent-soft: rgba(15, 139, 255, 0.16);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #e11d48;
+      --info: #0ea5e9;
+      --text: #f5f7fa;
+      --text-muted: #a3b1c2;
+      --text-dim: #6a7a8c;
+      --border: rgba(163, 177, 194, 0.18);
+      --border-strong: rgba(163, 177, 194, 0.32);
+      --shadow: 0 24px 54px rgba(2, 9, 16, 0.36);
+      --radius-xs: 6px;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --content-max: 1200px;
+      --space-2xs: 2px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+    }
+
+    body.light-mode {
+      --bg: #f5f7fa;
+      --bg-card: #ffffff;
+      --bg-elevated: #eef3f8;
+      --bg-hover: #dde4ec;
+      --accent-soft: rgba(15, 139, 255, 0.12);
+      --text: #121920;
+      --text-muted: #2a3440;
+      --text-dim: #6a7a8c;
+      --border: rgba(42, 52, 64, 0.12);
+      --border-strong: rgba(42, 52, 64, 0.22);
+      --shadow: 0 24px 54px rgba(24, 31, 43, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { color-scheme: dark; }
+    body.light-mode { color-scheme: light; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Instrument Sans", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(15, 139, 255, 0.18), transparent 32%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--bg) 78%, #102746 22%) 0%, var(--bg) 58%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(163, 177, 194, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(163, 177, 194, 0.03) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 80%);
+      pointer-events: none;
+    }
+
+    a,
+    button,
+    input,
+    select {
+      transition:
+        border-color 180ms cubic-bezier(0.45, 0, 0.2, 1),
+        background-color 180ms cubic-bezier(0.45, 0, 0.2, 1),
+        color 180ms cubic-bezier(0.45, 0, 0.2, 1),
+        transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent-light);
+      outline-offset: 2px;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      width: min(100%, var(--content-max));
+      margin: 0 auto;
+      padding: var(--space-lg);
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 92%, transparent), color-mix(in srgb, var(--bg-elevated) 88%, transparent));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding: 18px 20px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 6px;
+    }
+
+    .brand h1,
+    .hero-copy h2,
+    .cta h3,
+    .settings h3 {
+      margin: 0;
+      font-family: "General Sans", sans-serif;
+      letter-spacing: -0.03em;
+    }
+
+    .brand h1 {
+      font-size: clamp(1.4rem, 1.8vw, 1.9rem);
+    }
+
+    .brand p,
+    .hero-copy p,
+    .cta p,
+    .footer-note,
+    .settings-feedback {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill-link,
+    .mode-btn,
+    .btn {
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+      color: var(--text);
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .pill-link:hover,
+    .mode-btn:hover,
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(15, 139, 255, 0.44);
+      box-shadow: 0 10px 24px rgba(15, 139, 255, 0.14);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.95fr);
+      gap: var(--space-md);
+      padding: var(--space-md);
+    }
+
+    .hero-copy,
+    .hero-rail,
+    .sidebar,
+    .table-wrap,
+    .signal-panel,
+    .metric,
+    .settings-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+    }
+
+    .hero-copy {
+      padding: var(--space-xl);
+      background:
+        radial-gradient(circle at top left, rgba(15, 139, 255, 0.18), transparent 26%),
+        linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-elevated) 90%, transparent));
+    }
+
+    .eyebrow,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 7px 12px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(15, 139, 255, 0.28);
+      color: var(--accent-light);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .hero-copy h2 {
+      margin-top: 18px;
+      font-size: clamp(2.2rem, 4vw, 4.2rem);
+      line-height: 0.94;
+      max-width: 11ch;
+    }
+
+    .hero-copy p {
+      margin-top: 18px;
+      max-width: 62ch;
+      font-size: 1.02rem;
+    }
+
+    .hero-actions {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .hero-rail {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .stat {
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+      padding: 18px;
+    }
+
+    .stat-label,
+    .metric h3,
+    .table-title,
+    .signal-title,
+    .field label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.76rem;
+    }
+
+    .stat-value,
+    .metric p,
+    .money,
+    .table code {
+      font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-value {
+      margin-top: 10px;
+      font-size: clamp(1.4rem, 2.2vw, 2.1rem);
+      line-height: 1.12;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: var(--space-md);
+      padding: var(--space-md);
+    }
+
+    .sidebar {
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .side-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      background: transparent;
+      font-weight: 500;
+    }
+
+    .side-item:hover {
+      color: var(--text);
+      border-color: var(--border);
+      background: color-mix(in srgb, var(--bg-hover) 86%, transparent);
+    }
+
+    .side-item.active {
+      color: var(--text);
+      background: var(--accent-soft);
+      border-color: rgba(15, 139, 255, 0.3);
+    }
+
+    .side-item strong {
+      font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+
+    .content {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      padding: 18px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-elevated) 90%, transparent));
+    }
+
+    .metric p {
+      margin: 12px 0 0;
+      font-size: clamp(1.25rem, 2vw, 1.9rem);
+      line-height: 1.1;
+    }
+
+    .metric-note {
+      margin-top: 8px;
+      color: var(--text-dim);
+      font-size: 0.86rem;
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.9fr);
+      gap: 12px;
+    }
+
+    .table-wrap,
+    .signal-panel {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .table-header,
+    .signal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 0;
+    }
+
+    .table-title,
+    .signal-title {
+      color: var(--text);
+      letter-spacing: -0.01em;
+      text-transform: none;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .table-subtitle,
+    .signal-subtitle {
+      color: var(--text-dim);
+      font-size: 0.86rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+      margin-top: 10px;
+    }
+
+    th,
+    td {
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 0.94rem;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: color-mix(in srgb, var(--bg-card) 98%, transparent);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .merchant {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .category-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+
+    .signal-panel {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .signal-card {
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+      padding: 16px;
+    }
+
+    .signal-card h4 {
+      margin: 0 0 10px;
+      font-family: "General Sans", sans-serif;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+
+    .signal-card p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    .signal-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .signal-list-item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .signal-list-item:last-child { border-bottom: none; }
+
+    .signal-list-item span:last-child {
+      font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+      color: var(--text);
+    }
+
+    .cta {
+      padding: var(--space-lg);
+      display: grid;
+      gap: 14px;
+      background:
+        radial-gradient(circle at top right, rgba(15, 139, 255, 0.18), transparent 28%),
+        linear-gradient(120deg, color-mix(in srgb, var(--bg-card) 96%, transparent), color-mix(in srgb, var(--bg-elevated) 90%, transparent));
+    }
+
+    .cta h3 {
+      font-size: clamp(1.7rem, 2.7vw, 2.8rem);
+      line-height: 1.02;
+      max-width: 18ch;
+    }
+
+    .cta-actions,
+    .settings-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      border-color: rgba(15, 139, 255, 0.64);
+      color: #07131f;
+      box-shadow: 0 12px 28px rgba(15, 139, 255, 0.24);
+    }
+
+    .settings {
+      padding: var(--space-lg);
+      display: grid;
+      gap: 16px;
+    }
+
+    .settings-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .settings-card {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field input,
+    .field select {
+      min-height: 48px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+    }
+
+    .field input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .footer-note {
+      font-size: 0.9rem;
+    }
+
+    .settings-feedback {
+      min-height: 1.25rem;
+      font-size: 0.92rem;
+    }
+
+    .settings-feedback.success { color: var(--success); }
+    .settings-feedback.error { color: var(--error); }
+
+    @media (max-width: 1024px) {
+      .hero,
+      .dashboard,
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .layout {
+        padding: 16px;
+      }
+
+      .topbar,
+      .hero,
+      .dashboard,
+      .cta,
+      .settings {
+        padding: 16px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .topbar-actions {
+        justify-content: flex-start;
+      }
+
+      .hero-copy {
+        padding: 20px;
+      }
+
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-actions .btn,
+      .settings-actions .btn,
+      .hero-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <header class="panel topbar">
+      <div class="brand">
+        <h1>My Personal Finance App Main Preview</h1>
+        <p>Operational calm for a local-first finance dashboard. One system, one voice, no stray mockup aesthetics.</p>
+      </div>
+      <div class="topbar-actions">
+        <a class="pill-link" href="/">Insights</a>
+        <a class="pill-link" href="/monthly-spend">Monthly Spend</a>
+        <button id="modeToggle" class="mode-btn" type="button" aria-label="Switch mode">Switch to Light Mode</button>
+      </div>
+    </header>
+
+    <section class="panel hero">
+      <div class="hero-copy">
+        <div class="eyebrow">Operational Calm</div>
+        <h2>See where the month bent before it becomes a habit.</h2>
+        <p>
+          My Personal Finance App turns raw bank activity into a readable operating picture: where spend clusters,
+          what changed month over month, and which recurring charges deserve immediate action.
+        </p>
+        <div class="hero-actions">
+          <button id="joinWaitlistBtn" class="btn primary" type="button">Join Waitlist</button>
+          <button id="sampleReportBtn" class="btn" type="button">See Sample Report</button>
+        </div>
+      </div>
+
+      <div class="hero-rail">
+        <article class="stat">
+          <div class="stat-label">Money Shockwave</div>
+          <div class="stat-value">$4,218.44</div>
+        </article>
+        <article class="stat">
+          <div class="stat-label">Net Flow</div>
+          <div class="stat-value" style="color: var(--success);">+$1,244.72</div>
+        </article>
+        <article class="stat">
+          <div class="stat-label">Recurring Drag</div>
+          <div class="stat-value">7 active charges</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel dashboard">
+      <aside class="sidebar">
+        <a class="side-item" href="/"><span>Insights</span><strong>LIVE</strong></a>
+        <a class="side-item" href="/monthly-spend"><span>Monthly Spend</span><strong>MO</strong></a>
+        <a class="side-item" href="/rag"><span>RAG Chat</span><strong>Q&A</strong></a>
+        <a class="side-item" href="/health"><span>Health</span><strong>NEW</strong></a>
+        <a class="side-item" href="/plaid-link"><span>Connect Bank</span><strong>SYNC</strong></a>
+        <a class="side-item active" href="/main"><span>Main Preview</span><strong>SPEC</strong></a>
+      </aside>
+
+      <div class="content">
+        <div class="metric-grid">
+          <article class="metric">
+            <h3>Daily Burn</h3>
+            <p>$78.40</p>
+            <div class="metric-note">Average on active spend days in the selected window.</div>
+          </article>
+          <article class="metric">
+            <h3>Top Merchant Loop</h3>
+            <p>Whole Foods</p>
+            <div class="metric-note">8 hits this month, 14.1% of total outflow.</div>
+          </article>
+          <article class="metric">
+            <h3>Monthly Swing</h3>
+            <p>+11.8%</p>
+            <div class="metric-note">Dining and transport drove the increase over March.</div>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <section class="table-wrap">
+            <div class="table-header">
+              <div>
+                <div class="table-title">Recent Pressure Points</div>
+                <div class="table-subtitle">Transactions that explain the current story fastest.</div>
+              </div>
+              <div class="chip">Live Preview</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>2026-04-23</code></td>
+                  <td class="merchant">Uber Eats</td>
+                  <td><span class="category-chip">Food</span></td>
+                  <td class="money">$42.10</td>
+                </tr>
+                <tr>
+                  <td><code>2026-04-22</code></td>
+                  <td class="merchant">Chevron</td>
+                  <td><span class="category-chip">Transport</span></td>
+                  <td class="money">$58.77</td>
+                </tr>
+                <tr>
+                  <td><code>2026-04-22</code></td>
+                  <td class="merchant">Netflix</td>
+                  <td><span class="category-chip">Subscription</span></td>
+                  <td class="money">$19.99</td>
+                </tr>
+                <tr>
+                  <td><code>2026-04-21</code></td>
+                  <td class="merchant">Vanguard</td>
+                  <td><span class="category-chip">Savings</span></td>
+                  <td class="money">$350.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <aside class="signal-panel">
+            <div class="signal-header">
+              <div>
+                <div class="signal-title">Strongest Signal</div>
+                <div class="signal-subtitle">The page should always make the next move obvious.</div>
+              </div>
+            </div>
+
+            <div class="signal-card">
+              <h4>Delivery spend is becoming the easy default.</h4>
+              <p>Food delivery is up 22% month over month. Freeze new impulse orders this week and compare against grocery spend next Sunday.</p>
+            </div>
+
+            <div class="signal-card">
+              <h4>Recurring Drag</h4>
+              <div class="signal-list">
+                <div class="signal-list-item"><span>Netflix</span><span>$19.99</span></div>
+                <div class="signal-list-item"><span>Spotify</span><span>$11.99</span></div>
+                <div class="signal-list-item"><span>iCloud+</span><span>$9.99</span></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel cta">
+      <h3>Get weekly insight briefs before spend drift gets expensive.</h3>
+      <p>
+        This is the hosted offer direction: bank sync, recurring charge monitoring, monthly comparisons,
+        and narrative summaries without turning the product into a loud marketing page.
+      </p>
+    </section>
+
+    <section class="panel settings">
+      <div class="settings-head">
+        <h3>Settings / Admin</h3>
+        <div class="chip">Preview Controls</div>
+      </div>
+
+      <div class="settings-card">
+        <div class="field-grid">
+          <div class="field">
+            <label for="lookbackDays">Default Lookback Days</label>
+            <input id="lookbackDays" type="number" value="180" />
+          </div>
+          <div class="field">
+            <label for="defaultModel">Default Model</label>
+            <select id="defaultModel">
+              <option value="gpt-5-mini" selected>gpt-5-mini</option>
+              <option value="gpt-5.2">gpt-5.2</option>
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="apiToken">App API Token</label>
+            <input id="apiToken" type="password" value="................................" />
+          </div>
+          <div class="field full">
+            <label for="accountFilter">Plaid Account Filter</label>
+            <input id="accountFilter" type="text" value="chase" />
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="saveSettingsBtn" class="btn primary" type="button">Save Settings</button>
+          <button id="testPlaidBtn" class="btn" type="button">Test Plaid Connection</button>
+        </div>
+
+        <p id="settingsFeedback" class="settings-feedback" role="status" aria-live="polite"></p>
+        <p class="footer-note">Preview routes: <code>/main</code> and <code>/new-ui</code>. This page now matches the active My Personal Finance App design system.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const SETTINGS_KEY = 'pfa_preview_settings_v1';
+      const THEME_KEY = 'pfa_preview_theme';
+
+      const modeToggle = document.getElementById('modeToggle');
+      const lookbackDays = document.getElementById('lookbackDays');
+      const defaultModel = document.getElementById('defaultModel');
+      const apiToken = document.getElementById('apiToken');
+      const accountFilter = document.getElementById('accountFilter');
+      const settingsFeedback = document.getElementById('settingsFeedback');
+
+      const joinWaitlistBtn = document.getElementById('joinWaitlistBtn');
+      const sampleReportBtn = document.getElementById('sampleReportBtn');
+      const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+      const testPlaidBtn = document.getElementById('testPlaidBtn');
+
+      function setFeedback(message, type) {
+        settingsFeedback.textContent = message || '';
+        settingsFeedback.className = 'settings-feedback' + (type ? ' ' + type : '');
+      }
+
+      function applyTheme(theme) {
+        const isLight = theme === 'light';
+        document.body.classList.toggle('light-mode', isLight);
+        modeToggle.textContent = isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode';
+      }
+
+      function loadSavedSettings() {
+        try {
+          const raw = localStorage.getItem(SETTINGS_KEY);
+          if (!raw) {
+            return;
+          }
+          const saved = JSON.parse(raw);
+          if (saved.lookbackDays != null) lookbackDays.value = String(saved.lookbackDays);
+          if (saved.defaultModel) defaultModel.value = saved.defaultModel;
+          if (saved.apiToken) apiToken.value = saved.apiToken;
+          if (saved.accountFilter) accountFilter.value = saved.accountFilter;
+          setFeedback('Loaded saved preview settings.', 'success');
+        } catch (err) {
+          setFeedback('Failed to load saved settings.', 'error');
+        }
+      }
+
+      modeToggle.addEventListener('click', function () {
+        const nextTheme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+        applyTheme(nextTheme);
+        localStorage.setItem(THEME_KEY, nextTheme);
+      });
+
+      joinWaitlistBtn.addEventListener('click', function () {
+        window.location.href = '/#signupForm';
+      });
+
+      sampleReportBtn.addEventListener('click', function () {
+        window.location.href = '/monthly-spend';
+      });
+
+      saveSettingsBtn.addEventListener('click', function () {
+        const payload = {
+          lookbackDays: Number(lookbackDays.value || 0),
+          defaultModel: defaultModel.value,
+          apiToken: apiToken.value,
+          accountFilter: accountFilter.value
+        };
+
+        if (!Number.isFinite(payload.lookbackDays) || payload.lookbackDays < 1) {
+          setFeedback('Lookback days must be a positive number.', 'error');
+          return;
+        }
+
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload));
+          setFeedback('Settings saved locally in this browser.', 'success');
+        } catch (err) {
+          setFeedback('Unable to save settings in this browser.', 'error');
+        }
+      });
+
+      testPlaidBtn.addEventListener('click', function () {
+        window.location.href = '/plaid-link';
+      });
+
+      applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+      loadSavedSettings();
+    })();
+  </script>
+</body>
+</html>

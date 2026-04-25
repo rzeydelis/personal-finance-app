@@ -663,6 +663,7 @@ def tip_page():
 
 
 @app.route('/new-ui')
+@app.route('/main')
 def new_ui_page():
     """Preview route for the redesigned front-end."""
     return render_template('personal_finance_app.html')
