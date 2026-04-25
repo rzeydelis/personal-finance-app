@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pluto Finance Design System Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1014;
+      --card: #121920;
+      --card-elev: #18222d;
+      --border: #2a3440;
+      --text: #f5f7fa;
+      --muted: #a3b1c2;
+      --primary: #0f8bff;
+      --secondary: #10b981;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Instrument Sans", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 0%, rgba(15, 139, 255, 0.2), transparent 40%), var(--bg);
+      color: var(--text);
+    }
+    h1, h2, h3 { font-family: "General Sans", "Segoe UI", sans-serif; letter-spacing: -0.01em; margin: 0; }
+    .shell { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .hero { display: grid; gap: 10px; }
+    .eyebrow { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .muted { color: var(--muted); margin: 0; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .swatches { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .swatch { border-radius: 10px; border: 1px solid var(--border); padding: 12px; min-height: 90px; display: grid; align-content: end; }
+    .mono { font-family: "IBM Plex Mono", "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { border-radius: 10px; border: 1px solid var(--border); padding: 10px 14px; font: inherit; color: var(--text); background: var(--card-elev); }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-secondary { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
+    table { width: 100%; border-collapse: collapse; font-family: "IBM Plex Mono", "JetBrains Mono", monospace; }
+    th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card hero">
+      <div class="eyebrow">Operational Calm</div>
+      <h1>Pluto Finance Design System</h1>
+      <p class="muted">Unified typography, color tokens, spacing, and data presentation for all app screens.</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Typography</h2>
+        <p class="muted">Display: General Sans. Body: Instrument Sans. Data: IBM Plex Mono.</p>
+        <p style="font-family:'General Sans',sans-serif;font-size:28px;margin:14px 0 8px;">Monthly spend intelligence</p>
+        <p style="margin:0 0 8px;">Your recurring expenses are up 11% month-over-month.</p>
+        <p class="mono" style="margin:0;">2026-04-22 | NETFLIX | SUBSCRIPTION | $19.99</p>
+      </article>
+      <article class="card">
+        <h2>Palette</h2>
+        <div class="swatches">
+          <div class="swatch" style="background:#0f8bff;"><strong>Primary</strong><span class="mono">#0F8BFF</span></div>
+          <div class="swatch" style="background:#10b981;color:#05291f;"><strong>Secondary</strong><span class="mono">#10B981</span></div>
+          <div class="swatch" style="background:#121920;"><strong>Card</strong><span class="mono">#121920</span></div>
+          <div class="swatch" style="background:#18222d;"><strong>Card Elev</strong><span class="mono">#18222D</span></div>
+          <div class="swatch" style="background:#2a3440;"><strong>Border</strong><span class="mono">#2A3440</span></div>
+          <div class="swatch" style="background:#f5f7fa;color:#121920;"><strong>Text</strong><span class="mono">#F5F7FA</span></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Components</h2>
+      <div class="btns" style="margin-top:10px;">
+        <button class="btn btn-primary">Analyze Monthly Spend</button>
+        <button class="btn btn-secondary">Connect Bank</button>
+        <button class="btn">Clear Filters</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Data Table</h2>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>2026-04-24</td><td>Whole Foods</td><td>Groceries</td><td>$148.32</td></tr>
+          <tr><td>2026-04-23</td><td>Uber</td><td>Transport</td><td>$27.90</td></tr>
+          <tr><td>2026-04-22</td><td>Netflix</td><td>Subscription</td><td>$19.99</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
