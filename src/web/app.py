@@ -641,6 +641,12 @@ def tip_page():
     return render_template('finance_tip.html')
 
 
+@app.route('/new-ui')
+def new_ui_page():
+    """Preview route for the redesigned front-end."""
+    return render_template('personal_finance_app.html')
+
+
 @app.route('/monthly-spend')
 def monthly_spend_page():
     """Monthly expenditure breakdown page."""
