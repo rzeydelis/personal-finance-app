@@ -1,7 +1,7 @@
-# Design System - Pluto Finance
+# Design System - My Personal Finance App
 
 ## Product Context
-- **What this is:** Pluto Finance is a local-first personal finance web app that ingests CSV or Plaid transaction data and turns it into actionable spending insights, monthly summaries, and question answering.
+- **What this is:** My Personal Finance App is a local-first personal finance web app that ingests CSV or Plaid transaction data and turns it into actionable spending insights, monthly summaries, and question answering.
 - **Who it's for:** Individual users who want fast clarity on spending habits without sending raw financial history to third-party SaaS dashboards.
 - **Space/industry:** Consumer fintech, personal analytics, local AI-assisted decision support.
 - **Project type:** Web app dashboard with analysis workflows.
@@ -39,15 +39,23 @@
 - **Grid:** Mobile 4 columns, tablet 8 columns, desktop 12 columns.
 - **Max content width:** 1200px for analysis pages, 960px for focused setup flows.
 - **Border radius:** xs 6px, sm 10px, md 14px, lg 20px, pill 9999px.
+- **Chrome guidance:** Use compact top navigation, left-rail task switching for data-heavy views, and reserve full-width editorial hero treatment for a single dominant insight rather than generic marketing copy.
 
 ## Motion
 - **Approach:** Intentional.
 - **Easing:** enter `cubic-bezier(0.16, 1, 0.3, 1)`, exit `cubic-bezier(0.7, 0, 0.84, 0)`, move `cubic-bezier(0.45, 0, 0.2, 1)`.
 - **Duration:** micro(80ms) short(180ms) medium(280ms) long(500ms).
 
+## Implementation Notes
+- **Preview routes:** `/main` and any design-preview pages must use the same approved font stack and token palette as production surfaces. No alternate preview-only brand language.
+- **Typography rule:** General Sans for display only, Instrument Sans for UI/body, IBM Plex Mono for money/date/tabular data, JetBrains Mono for code or debug-only contexts.
+- **Surface rule:** Large panels should feel layered with `bg`, `card`, and `elevated` surfaces rather than relying on saturated gradients or neon borders.
+- **CTA rule:** Primary actions should read as decisive utility controls, not marketing buttons.
+
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-04-25 | Established initial Pluto Finance design system | Consolidates the current multi-template UI into one coherent token set and typography hierarchy. |
+| 2026-04-25 | Established initial My Personal Finance App design system | Consolidates the current multi-template UI into one coherent token set and typography hierarchy. |
 | 2026-04-25 | Selected General Sans + Instrument Sans + IBM Plex Mono | Improves visual character while preserving readability in dense financial tables and metrics. |
 | 2026-04-25 | Standardized accent strategy around blue + emerald | Replaces per-page accent drift and maps color directly to action and outcome semantics. |
+| 2026-04-25 | Locked preview routes to the production design system | Prevents mockup pages from drifting into a second visual language that would confuse implementation. |

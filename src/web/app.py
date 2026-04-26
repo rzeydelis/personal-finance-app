@@ -14,6 +14,7 @@ import hmac
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException
 
 from finance_tip import MAX_TIP_TRANSACTIONS, generate_finance_tip
 from utils import parse_csv_transactions
@@ -89,6 +90,7 @@ PROTECTED_API_PATHS = {
     '/api/plaid-token',
     '/api/link-token',
     '/api/finance-tip',
+    '/api/main-preview',
     '/api/monthly-spend',
     '/api/transactions-rag/query',
     '/api/apple-health/analyze',
@@ -180,6 +182,21 @@ def get_client_ip():
     return request.remote_addr or ''
 
 
+def is_local_request_without_proxy():
+    """Allow localhost dev requests only when they are not proxied."""
+    forwarded = (
+        request.headers.get('X-Forwarded-For')
+        or request.headers.get('X-Forwarded-Host')
+        or request.headers.get('X-Forwarded-Proto')
+        or request.headers.get('Forwarded')
+    )
+    if forwarded:
+        return False
+
+    client_ip = get_client_ip().strip().lower()
+    return client_ip in {'127.0.0.1', '::1', 'localhost'}
+
+
 def extract_api_token():
     auth_header = (request.headers.get('Authorization') or '').strip()
     if auth_header.lower().startswith('bearer '):
@@ -235,6 +252,8 @@ def enforce_api_security():
         return None
 
     if not API_AUTH_TOKEN:
+        if is_local_request_without_proxy():
+            return None
         return api_error(
             'Protected API access is unavailable because APP_API_TOKEN is not configured on the server.',
             503,
@@ -249,6 +268,8 @@ def enforce_api_security():
 @app.errorhandler(Exception)
 def handle_unexpected_error(exc):
     """Return JSON for API routes and log the full exception."""
+    if isinstance(exc, HTTPException):
+        return exc
     logging.exception("Unhandled error on %s %s", request.method, request.path)
     if request.path.startswith('/api'):
         return api_error('Internal server error.', 500)
@@ -266,6 +287,9 @@ def handle_request_too_large(exc):
 @app.after_request
 def set_security_headers(response):
     """Set baseline HTTP security headers."""
+    embeddable_paths = {'/monthly-spend', '/rag', '/health'}
+    allow_same_origin_embed = request.path in embeddable_paths and request.args.get('embedded') == '1'
+    frame_ancestors = "'self'" if allow_same_origin_embed else "'none'"
     csp = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.plaid.com; "
@@ -274,10 +298,10 @@ def set_security_headers(response):
         "img-src 'self' data:; "
         "connect-src 'self' https://api.openai.com http://localhost:11434 https://localhost:11434 https://cdn.plaid.com https://*.plaid.com; "
         "frame-src 'self' https://cdn.plaid.com https://*.plaid.com; "
-        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        f"frame-ancestors {frame_ancestors}; base-uri 'self'; form-action 'self'"
     )
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN' if allow_same_origin_embed else 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
     response.headers['Content-Security-Policy'] = csp
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
@@ -569,6 +593,19 @@ def load_transactions_or_error(data, default_lookback_days=90):
     return None, api_error(load_result['error'], load_result['status_code'])
 
 
+def _main_preview_category(transaction, outflow_sign):
+    raw_amount = float(transaction.get('amount') or 0)
+    if raw_amount * outflow_sign <= 0:
+        return 'Income'
+    if is_savings_allocation(transaction):
+        return 'Savings'
+    if is_internal_money_move(transaction):
+        return 'Transfer'
+    if is_withdrawal_transaction(transaction):
+        return 'Cash'
+    return 'Spend'
+
+
 # ==================== ROUTES ====================
 
 
@@ -651,15 +688,88 @@ def get_available_models():
     })
 
 
+@app.route('/api/main-preview', methods=['POST'])
+def main_preview_api():
+    """Return live Main Preview payload built from transaction data."""
+    file_path = None
+    cleanup_after_request = False
+    try:
+        data = get_request_json()
+        load_result, error_response = load_transactions_or_error(data, default_lookback_days=90)
+        if error_response:
+            return error_response
+
+        file_path = load_result['file_path']
+        cleanup_after_request = load_result.get('cleanup_after_request', False)
+        lookback_days = load_result['lookback_days']
+        transactions = load_result['transactions']
+
+        ordered = sorted(
+            [trx for trx in transactions if trx.get('datetime')],
+            key=lambda item: item.get('datetime', datetime.min),
+            reverse=True,
+        )
+        if not ordered:
+            return api_error('No valid transactions with dates were found.', 400)
+
+        outflow_sign = detect_outflow_sign(ordered)
+        outflows = [trx for trx in ordered if float(trx.get('amount') or 0) * outflow_sign > 0]
+        non_internal_outflows = [trx for trx in outflows if not is_internal_money_move(trx)]
+        pressure_source = non_internal_outflows if non_internal_outflows else outflows
+        pressure_points = [
+            {
+                'date': trx.get('date') or '',
+                'merchant': merchant_text(trx),
+                'category': _main_preview_category(trx, outflow_sign),
+                'amount': round(abs(float(trx.get('amount') or 0)), 2),
+                'amount_display': format_currency(abs(float(trx.get('amount') or 0))),
+            }
+            for trx in pressure_source[:8]
+        ]
+
+        transaction_summary = build_transaction_summary(ordered, lookback_days)
+        story_cards = transaction_summary.get('story_cards') or []
+        strongest_signal = story_cards[0] if story_cards else {}
+        recurring_drag = transaction_summary.get('recurring_watchlist') or []
+        top_merchant = (transaction_summary.get('merchant_leaderboard') or [{}])[0]
+        monthly_swing = transaction_summary.get('monthly_comparison') or {}
+
+        return jsonify(
+            {
+                'success': True,
+                'lookback_days': lookback_days,
+                'transaction_count': len(ordered),
+                'pressure_points': pressure_points,
+                'strongest_signal': {
+                    'eyebrow': strongest_signal.get('eyebrow') or '',
+                    'headline': strongest_signal.get('headline') or '',
+                    'detail': strongest_signal.get('detail') or '',
+                },
+                'top_merchant_loop': top_merchant,
+                'monthly_swing': monthly_swing,
+                'recurring_drag': recurring_drag,
+                'transaction_summary': transaction_summary,
+                'timestamp': datetime.now().isoformat(),
+            }
+        )
+    except Exception:
+        logging.exception("Main preview analysis failed")
+        return api_error('Main preview analysis failed.', 500)
+    finally:
+        cleanup_transaction_file(file_path, should_cleanup=cleanup_after_request)
+
+
 @app.route('/')
 def index():
-    """Home page - Finance tip page"""
-    return render_template('finance_tip.html')
+    """Home page - main preview shell with embedded Insights tab."""
+    return render_template('personal_finance_app.html')
 
-@app.route('/tip')
-def tip_page():
-    """Finance tip page"""
-    return render_template('finance_tip.html')
+
+@app.route('/new-ui')
+@app.route('/main')
+def new_ui_page():
+    """Preview route for the redesigned front-end."""
+    return render_template('personal_finance_app.html')
 
 
 @app.route('/monthly-spend')
@@ -678,12 +788,6 @@ def rag_chat_page():
 def apple_health_page():
     """Apple Health upload and analysis page."""
     return render_template('apple_health.html')
-
-
-@app.route('/plaid-link')
-def plaid_link_page():
-    """Helper page to run Plaid Link and capture tokens."""
-    return render_template('plaid_link.html')
 
 
 @app.route('/api/apple-health/analyze', methods=['POST'])

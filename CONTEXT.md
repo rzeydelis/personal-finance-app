@@ -160,6 +160,7 @@ Related docs:
 - `docs/DEPLOY_EC2.md`
 - `deploy/systemd/personal-finance-app.service`
 - `deploy/nginx/personal-finance-app.conf`
+- `docs/designs/pluto-finance-agentic-architecture.md` (future TODO plan)
 
 ## Known caveats (current state)
 - `scripts/ec2/bootstrap_ubuntu.sh` references `deploy/env/personal-finance-app.env.example`, but that file is not present in `deploy/`.

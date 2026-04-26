@@ -61,6 +61,20 @@
       z-index: 0;
     }
 
+    body.embedded-mode::before {
+      display: none;
+    }
+
+    body.embedded-mode nav,
+    body.embedded-mode .hero {
+      display: none;
+    }
+
+    body.embedded-mode main {
+      max-width: none;
+      padding: 12px 12px 28px;
+    }
+
     .app { position: relative; z-index: 1; }
 
     nav {
@@ -570,11 +584,8 @@
     <nav>
       <div class="logo">Pluto Finance</div>
       <div class="nav-links">
-        <a href="/">Insights</a>
-        <a href="/monthly-spend">Monthly Spend</a>
-        <a href="/rag">RAG Chat</a>
-        <a href="/health" class="active">Health</a>
-        <a href="/plaid-link">Connect Bank</a>
+        <a href="/main?tab=insights">Insights</a>
+        <a href="/main">Main Preview</a>
       </div>
     </nav>
 
@@ -700,6 +711,13 @@
   </div>
 
   <script>
+    (function applyEmbeddedMode() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('embedded') === '1') {
+        document.body.classList.add('embedded-mode');
+      }
+    })();
+
     let uploadedFile = null;
     let lastResult = null;
 
